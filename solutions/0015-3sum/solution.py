@@ -1,24 +1,64 @@
 class Solution:
     def threeSum(self, nums: List[int]) -> List[List[int]]:
-        outer_list = []
-        nums_dict = dict()
-        nums.sort() 
-        #sorted so if the total sum is less than 0 we move up the left pointer and if it is greater than 0 then we move down the right pointer
-        for i, mid in enumerate(nums): #we are comparing each number in the list or the variable mid to the rest of the numbers by using left and right pointers
+        nums = sorted(nums)
+        out = []
+        sorted_dict = dict()
+        for i in range(len(nums)):
+            one = nums[i]
+            if one > 0:
+                break
+            if i > 0 and nums[i] == nums[i - 1]:
+                continue
             left = i + 1
             right = len(nums) - 1
+
             while left < right:
-                if mid + nums[left] + nums[right] < 0:
+                if nums[left] + nums[right] + one < 0:
                     left += 1
-                elif mid + nums[left] + nums[right] > 0:
+                elif nums[left] + nums[right] + one > 0:
                     right -= 1
                 else:
-                    inner_list = [mid, nums[left], nums[right]]
-                    inner_list.sort()
-                    key = tuple(inner_list)
-                    if key not in nums_dict:
-                        outer_list.append(inner_list)
-                        nums_dict[key] = 1 
-                    inner_list = []
+                    key = tuple([one, nums[left], nums[right]])
+                    if key not in sorted_dict:
+                        sorted_dict[key] = 1
+                        out.append(key)
                     left += 1
-        return outer_list
+                    if nums[left] == nums[left - 1] and left < right:
+                        left += 1
+
+        return out
+
+
+
+        # if len(nums) < 2:
+        #     return [[]]
+        # one, two, three = 0, 1, 2
+        # out = []
+        # while one + 2 < len(nums):
+        #     if nums[one] + nums[two] + nums[three] == 0:
+        #         ans = [nums[one], nums[two], nums[three]]
+        #         if tuple(sorted(ans)) not in out:
+        #             out.append(tuple(sorted(ans)))
+        #     while two + 1< len(nums):
+        #         if nums[one] + nums[two] + nums[three] == 0:
+        #             ans = [nums[one], nums[two], nums[three]]
+        #             if tuple(sorted(ans)) not in out:
+        #                 out.append(tuple(sorted(ans)))
+        #         while three < len(nums):
+        #             if nums[one] + nums[two] + nums[three] == 0:
+        #                 ans = [nums[one], nums[two], nums[three]]
+        #                 if tuple(sorted(ans)) not in out:
+        #                     out.append(tuple(sorted(ans)))
+        #             three += 1
+        #         two+=1
+        #         if two + 1 < len(nums):
+        #             three = two + 1
+        #     one += 1
+        #     if one + 1 < len(nums):
+        #         two = one + 1
+        #     if two + 1 < len(nums):
+        #         three = two + 1
+                
+        #return out
+                
+
