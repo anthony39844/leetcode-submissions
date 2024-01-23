@@ -1,27 +1,29 @@
-import array
-
 class Solution:
     def productExceptSelf(self, nums: List[int]) -> List[int]:
-        answer = []
-        total = 1
-        has_zero = False
-        zeroes = 0
-        for num in nums:
-            if num != 0: 
-                total *= num #if the num is not a 0 multiply it by the total
-            elif num == 0: #checking if their are zeroes
-                has_zero = True
-                zeroes += 1
-        for i in nums:
-            if has_zero: #if there are zeroes
-                if i != 0: #if the num is not a zero
-                    answer.append(0) #append a 0 because if there are 0s then the product is 0
-                else: #if the num is a zero
-                    if zeroes == 1: #if there is only one zero 
-                        answer.append(total) #append the total because the product is all the numbers besides that 0 so the product is not 0 but the total
-                    elif zeroes > 1: #if there is more than one 0
-                        answer.append(0) #append a 0 because the product will be 0 again
-            else: #if there are no zeroes
-                answer.append(int(total * (i ** -1)))
-        return answer
+        out = [1]
+
+        for i in range(1, len(nums)): 
+            out.append(out[i - 1] * nums[i - 1])
+            # [1, 2, 3, 4]
+            # out = [1] loop
+            # out = [1, 1*1] loop i = 1
+            # out = [1, 1, 1*2] loop i = 2
+            # out = [1, 1, 2, 2*3] i = 3
+        #so this loop makes an array with product of the elements to the left of the index
+
+        right = 1
+        for i in range(len(nums) - 1, -1, -1):
+            out[i] *= right
+            right *= nums[i]
+
+            # out = [1, 1, 2, 6]
+            # out = [1, 1, 2, 6*1] i = 3, right = 4
+            # out = [1, 1, 2*4, 6] i = 2, right = 12
+            # out = [1, 1*12, 8, 6] i = 1, right = 24
+            # out = [1*24, 12, 8, 6] i = 0, right = 24
+            # out = [24, 12, 8, 6] end loop
+        # this loop multiplies the index with the product of the elements to the right of it
+        return out
+
+     
 
