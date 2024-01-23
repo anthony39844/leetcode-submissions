@@ -1,7 +1,13 @@
 class Solution:
     def twoSum(self, nums: List[int], target: int) -> List[int]:
-        for x in range(len(nums)):
-            for y in range(x + 1, len(nums)):
-                if nums[x] + nums [y] == target:
-                    return [x, y]
-            
+        d = {}
+        for i in range(len(nums)):
+            d[nums[i]] = i
+        
+        for i in range(len(nums)):
+            val = target - nums[i]
+            if val in d and i != d[val]:
+                return [i, d[val]]
+                
+        
+        
