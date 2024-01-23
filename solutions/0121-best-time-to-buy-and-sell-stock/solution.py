@@ -1,8 +1,8 @@
 class Solution:
     def maxProfit(self, prices: List[int]) -> int:
         diff = 0
-        min = 1000000
-        for i in prices:
+        min = prices[0]
+        for i in prices[1:]:
             if i < min:
                 min = i
             if i - min >= diff:
