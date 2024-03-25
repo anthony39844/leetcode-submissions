@@ -3,7 +3,7 @@ class Solution:
         d = {}
         for i in range(len(nums)):
             d[nums[i]] = i
-        
+
         for i in range(len(nums)):
             val = target - nums[i]
             if val in d and i != d[val]:
