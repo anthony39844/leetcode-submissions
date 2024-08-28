@@ -1,18 +1,12 @@
 class Solution:
     def isAnagram(self, s: str, t: str) -> bool:
-        if (len(s) != len(t)):
+        d = dict()
+        d2 = dict()
+        for i in s:
+            d[i] = d.get(i, 0) + 1
+        for i in t:
+            d2[i] = d2.get(i, 0) + 1
+        if d == d2:
+            return True
+        else:
             return False
-
-        letterCount = {}
-        for char in s:
-            if char not in letterCount:
-                letterCount[char] = 1
-            else:
-                letterCount[char] += 1
-
-        for char in t:
-            if char not in letterCount or (t.count(char) != letterCount[char]) :
-                return False
-
-        return True
-        
