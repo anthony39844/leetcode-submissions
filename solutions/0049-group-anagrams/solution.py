@@ -1,14 +1,14 @@
 class Solution:
     def groupAnagrams(self, strs: List[str]) -> List[List[str]]:
-        map = {}
-        answer = []
+        d = {}
+        out = []
         for i in strs:
-            sort = ''.join(sorted(i))
-            if sort not in map:
-                map[sort] = []
-            map[sort].append(i)
-        
-        for val in map.values():
-            answer.append(val)
-        return answer
-            
+            s = "".join(sorted(i))
+            if s not in d:
+                d[s] = [i]
+            else:
+                d[s].append(i)
+        for i in d:
+            out.append(d[i])
+        return out
+
