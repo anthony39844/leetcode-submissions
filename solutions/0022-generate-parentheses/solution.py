@@ -1,19 +1,23 @@
 class Solution:
     def generateParenthesis(self, n: int) -> List[str]:
-        parentheses_list = []
-        s = ""
-        def generate(s, open_parentheses, close_parentheses):
-            if len(s) == 2 * n:
-                parentheses_list.append(s)
+        out = []
+        stack = []
+
+        def backtrack(open, close, s):
+            if open == n and close == n:
+                out.append(''.join(s))
                 return
-            if open_parentheses < n:
-                generate(s + '(', open_parentheses + 1, close_parentheses)
-            if close_parentheses < open_parentheses:
-                generate(s + ')', open_parentheses, close_parentheses + 1)
+            if open < n:
+                s.append('(')
+                backtrack(open + 1, close, s)
+                s.pop()
 
-        generate(s, 0, 0)
-        return parentheses_list
-
-
-
+            if open > close:
+                s.append(')')
+                backtrack(open, close + 1, s)
+                s.pop()
         
+        backtrack(0, 0, stack)
+        return out
+
+
