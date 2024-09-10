@@ -1,12 +1,20 @@
 class Solution:
     def searchMatrix(self, matrix: List[List[int]], target: int) -> bool:
-        row = 0
-        col = len(matrix[row]) - 1
-        while row < len(matrix) and col >= 0:
-            if matrix[row][col] < target:
-                row += 1
-            elif matrix[row][col] > target:
-                col -= 1
+        l = 0
+        r = len(matrix[0]) - 1
+        for i in range(len(matrix)):
+            if matrix[i][r] < target:
+                continue
+            elif matrix[i][r] > target:
+                while l < r:
+                    mid = (l + r) // 2
+                    if matrix[i][mid] < target:
+                        l += 1
+                    elif matrix[i][mid] > target:
+                        r -= 1
+                    else:
+                        return True
             else:
                 return True
+
         return False
