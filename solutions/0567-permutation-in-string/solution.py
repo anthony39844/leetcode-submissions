@@ -3,38 +3,31 @@ class Solution:
         if len(s1) > len(s2):
             return False
 
-        
-        d1 = {c:0 for c in string.ascii_lowercase}
-        d2 = {c:0 for c in string.ascii_lowercase}
-
+        d = [0] * 26
         for i in s1:
-            d1[i] += 1
-
-        for j in range(len(s2)):
-            d2[s2[j]] += 1
-            if j >= len(s1):
-                d2[s2[j - len(s1)]] -= 1
-            if(d1 == d2):
-                return True
+            if i not in s2:
+                return False
+            d[ord(i) - ord('a')] += 1
         
-        return False
-"""
-        window = len(s1)
-        left = 0
-        right = left + window - 1
-        letters = {}
-        substring = {}
-        for c in s1:
-            substring[c] = 1 + substring.get(c, 0)
-        while right < len(s2):
-            letters.clear()
-            for i in s2[left: right + 1]:
-                letters[i] = 1 + letters.get(i, 0)
-            if substring == letters:
-                return True
+        d2 = [0] * 26
+        s = s2[:len(s1)]
+        for i in s:
+            d2[ord(i) - ord('a')] += 1
 
-            left += 1
-            right = left + window - 1
+        if d == d2:
+            return True
+        
+        l = 0
+        for r in range(len(s1), len(s2)):
+            d2[ord(s2[l]) - ord('a')] -= 1
+            
+            d2[ord(s2[r]) - ord('a')] += 1
+
+            if d2 == d:
+                return True
+            l += 1
+
         return False
-"""
+            
+                
 
