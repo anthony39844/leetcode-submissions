@@ -1,15 +1,19 @@
 class Solution:
     def characterReplacement(self, s: str, k: int) -> int:
+        out = 0
+        l = 0
+        x = 0
+        m = 0
         count = {}
-        res = 0
-        left = 0
-        maxf = 0
-        for r in range(len(s)):
-            count[s[r]] = 1 + count.get(s[r], 0)
-            maxf = max(maxf, count[s[r]])
+        for i in range(0, len(s)):
+            count[s[i]] = count.get(s[i], 0) + 1
+            #x = (i - l + 1) - max(count.values()) how many characters need to be changed
+            m = max(count[s[i]], m)
+            x = (i - l + 1) - m
+            if x > k: #if greater, move the window up, update count
+                count[s[l]] -= 1
+                l += 1
+            out = max(out, i - l + 1) #get length of window
 
-            while (r - left + 1) - maxf > k:
-                count[s[left]] -= 1
-                left += 1
-            res = max(res, r - left + 1)
-        return res
+        return out
+
