@@ -5,59 +5,40 @@
 #         self.next = next
 class Solution:
     def reorderList(self, head: Optional[ListNode]) -> None:
-        slow = head #the latter half of the list
-        fast = head
-        count = 0
-            
-        while fast.next:
-            fast = fast.next
-            if count % 2 == 0:
-                slow = slow.next
-            count += 1
-
-        current = slow #this is reversing the latter half of the list
-        rev = None
-        while current:
-            next_node = current.next
-            current.next = rev
-            rev = current
-            current = next_node
         """
-        curr = head 
-        print(rev)
-        next = curr.next #nodes after
-        print(next)
-        curr.next = rev #set next node to rev
-        print(curr)
-        curr = curr.next #move curr up
-        print(curr)
-        rev = rev.next #move rev up 
-        print(rev)
-        curr.next = next #set next to the next 
-        print(curr)
-        print(head)
-        next = next.next #move next up
-        print(next)
-        curr = curr.next #move curr up again
-        print(curr)
-        curr.next = rev #set next to the next rev
+        Do not return anything, modify head in-place instead.
         """
-        curr = head
-        next = curr.next
-        while rev.next:
-            curr.next = rev
-            curr = curr.next
-            rev = rev.next
-            curr.next = next
-            next = next.next
-            curr = curr.next
+        if not head.next or not head.next.next:
+            return
 
+        back, end = head, head.next
 
-            
+        while end and end.next: #using slow and fast pointer to find middle of list
+            back = back.next
+            end = end.next.next
+
+        cur = back.next #back end of the list
+        back.next = None #severs front of list from the back half, otherwise when reversing back will point to the last node in the rev list
+
+        prev = None #reversing list
+        while cur:
+            next = cur.next
+            cur.next = prev
+            prev = cur
+            cur = next
         
-        
+        front = head
+        b_next = prev
+
+        while prev:
+            next = front.next
+            front.next = b_next
+            front = next
+
+            b_next = prev.next
+            prev.next = next
+            prev = b_next
 
 
 
-        
 
