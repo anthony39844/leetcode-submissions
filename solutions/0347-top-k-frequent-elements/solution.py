@@ -1,16 +1,13 @@
 class Solution:
     def topKFrequent(self, nums: List[int], k: int) -> List[int]:
         d = {}
-        for i in nums:
-            if i not in d:
-                d[i] = 1
-            else:
-                d[i] += 1
         out = []
-        for i in range(k):
-            cur = list(d.keys())[list(d.values()).index(max(d.values()))]
-            out.append(cur)
-            del d[cur]  
-
-        return out      
+        for i in nums:
+            d[i] = d.get(i, 0) + 1
+        topK = sorted(list(d.items()), key=lambda x:x[1], reverse=True)[:k]
+        print(topK)
+        for i in topK:
+            out.append(i[0])
+        return out 
+            
 
