@@ -3,14 +3,15 @@ class Solution:
         m = 0
         s = set(nums)
         for i in s:
-            cur_len = 1
-            cur = i
-            if i - 1 not in s:
-                while cur + 1 in s:
-                    cur += 1
-                    cur_len += 1
-                m = max(m, cur_len)
+            num = i
+            count = 1
+            if num - 1 not in s:
+                while num + 1 in s:
+                    count += 1
+                    num += 1
+                m = max(m, count)
         return m
+            
             
 
                 
