@@ -1,15 +1,16 @@
 class Solution:
     def generateParenthesis(self, n: int) -> List[str]:
-        stack = []    
+        out = []
+
         def generate(o, c, s):
             if len(s) == n * 2:
-                stack.append(s)
-                return
-            if o < n: 
+                out.append(s)
+                return 
+            if o < n:
                 generate(o + 1, c, s + "(")
-            if c < n and c < o:
+            if c < o:
                 generate(o, c + 1, s + ")")
-
-        generate(1, 0, "(")
-        return stack
-
+    
+        generate(0, 0, "")
+        return out
+            
