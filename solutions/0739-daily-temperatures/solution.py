@@ -3,11 +3,13 @@ class Solution:
         out = [0] * len(temperatures)
         s = [(temperatures[0], 0)]
         for i in range(1, len(temperatures)):
-            while temperatures[i] > s[-1][0]:
-                x = s.pop()[1]
-                out[x] = i - x
+            while s[-1][0] < temperatures[i]:
+                out[s[-1][1]] = i - s[-1][1]
+                s.pop()
                 if not s:
-                    s.append((temperatures[i], i))
+                    break
             s.append((temperatures[i], i))
+        
         return out
+        
             
