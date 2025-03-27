@@ -6,4 +6,3 @@ class Solution:
                 return True
             s.add(i)
         return False
-
