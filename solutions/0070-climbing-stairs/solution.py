@@ -1,21 +1,21 @@
 class Solution:
     def climbStairs(self, n: int) -> int:
-        answers = {}
-        def fib(n):
-            if n == 0:
-                return 1
-            elif n == 1:
-                return 1
 
-            # Check if the value has already been computed
-            if n in answers:
-                return answers[n]
+        # arr = [0] * (n + 1)
+        # arr[n] = 1
+        # arr[n-1] = 1
+        # for i in range(n - 2, -1, -1):
+        #     arr[i] = arr[i + 1] + arr[i + 2]
+        
 
-            # Compute Fibonacci recursively and store the result
-            answers[n] = fib(n - 1) + fib(n - 2)
-            return answers[n]
+        # return arr[0]
 
-        return fib(n)
+        one = 0
+        two = 1
+        out = 1
+        for i in range(n):
+            out = one + two
+            one = two
+            two = out
 
-
-
+        return out
