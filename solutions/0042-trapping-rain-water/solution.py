@@ -5,17 +5,12 @@ class Solution:
         maxL, maxR = height[0], height[-1]
         while l < r:
             if maxL <= maxR:
-                if maxL - height[l] > 0:
-                    tot += maxL - height[l]
+                tot += maxL - height[l]
                 l += 1
-                maxL = max(height[l], maxL)
-            elif maxL > maxR:
-                if maxR - height[r] > 0:
-                    tot += maxR - height[r]
+                maxL = max(maxL, height[l])
+            else:
+                tot += maxR - height[r]
                 r -= 1
-                maxR = max(height[r], maxR)
-        
-        return tot
-            
-            
+                maxR = max(maxR, height[r])
 
+        return tot
