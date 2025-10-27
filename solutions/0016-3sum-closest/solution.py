@@ -1,7 +1,9 @@
 class Solution:
     def threeSumClosest(self, nums: List[int], target: int) -> int:
+        '''
+        time = o()
+        '''
         nums.sort()
-
         out = sum(nums[:3])
         if out == target:
             return out
