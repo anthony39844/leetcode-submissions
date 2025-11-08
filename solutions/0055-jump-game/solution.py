@@ -1,5 +1,9 @@
 class Solution:
     def canJump(self, nums: List[int]) -> bool:
+        '''
+        time = o(n)
+        space = o(1)
+        '''
         if len(nums) == 1:
             return True
         if nums[0] == 0:
@@ -8,5 +12,5 @@ class Solution:
         for i in range(len(nums) - 2, -1, -1):
             if nums[i] + i >= goal:
                 goal = i
-        return goal <= nums[0]
+        return goal <= 0
             
