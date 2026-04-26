@@ -1,13 +1,13 @@
 class Solution:
     def isValid(self, s: str) -> bool:
         st = []
-        open_p = {'(': ')', '{': '}', '[': ']'}
+
+        p = {')': '(', '}': '{',  ']': '['}
 
         for i in s:
-            if i in open_p:
-                st.append(open_p[i])
-            else:
-                if not st or st.pop() != i:
+            if i in p:
+                if not st or st.pop() != p[i]:
                     return False
-        
-        return len(st) == 0
+            else:
+                st.append(i)
+        return st == []
