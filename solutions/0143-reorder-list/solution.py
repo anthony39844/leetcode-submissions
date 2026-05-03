@@ -3,42 +3,32 @@
 #     def __init__(self, val=0, next=None):
 #         self.val = val
 #         self.next = next
+
 class Solution:
     def reorderList(self, head: Optional[ListNode]) -> None:
-        """
-        Do not return anything, modify head in-place instead.
-        """
-        if not head.next or not head.next.next:
-            return
-
-        back, end = head, head.next
-
-        while end and end.next: #using slow and fast pointer to find middle of list
-            back = back.next
-            end = end.next.next
-
-        cur = back.next #back end of the list
-        back.next = None #severs front of list from the back half, otherwise when reversing back will point to the last node in the rev list
-
-        prev = None #reversing list
-        while cur:
-            next = cur.next
-            cur.next = prev
-            prev = cur
-            cur = next
+        cur = head
+        s = []
+        x = 0
         
-        front = head
-        b_next = prev
+        while cur:
+            s.append(cur)
+            cur = cur.next
+            x += 1
 
-        while prev:
-            next = front.next
-            front.next = b_next
-            front = next
+        half = math.ceil(x / 2)
 
-            b_next = prev.next
-            prev.next = next
-            prev = b_next
+        for i in range(half - 1):
+            head.next = s.pop()
+            head = head.next
+            head.next = None
 
+            head.next = s[i + 1]
+            head = head.next
+            head.next = None
 
+        if x % 2 == 0:
+            head.next = s.pop()
+            head = head.next
+            head.next = None
 
 
