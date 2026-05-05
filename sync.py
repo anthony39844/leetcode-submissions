@@ -13,11 +13,25 @@ def call_leetcode(query, variables):
     headers = {
         "Cookie": f"LEETCODE_SESSION={SESSION}; csrftoken={CSRF_TOKEN}",
         "X-CSRFToken": CSRF_TOKEN,
-        "Referer": "https://leetcode.com"
+        "Referer": "https://leetcode.com",
+        # Adding this prevents many bot-detection blocks
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
     }
+    
     resp = requests.post(URL, json={'query': query, 'variables': variables}, headers=headers)
-    return resp.json()
-
+    
+    # Check if the request was successful
+    if resp.status_code != 200:
+        print(f"Error {resp.status_code}: {resp.text}")
+        raise Exception(f"LeetCode API returned status code {resp.status_code}")
+    
+    try:
+        return resp.json()
+    except Exception as e:
+        # This will show us if it's returning HTML instead of JSON
+        print("Failed to parse JSON. Response was:")
+        print(resp.text)
+        raise e
 def get_all_submissions():
     all_subs, offset, limit = [], 0, 20
     while True:
