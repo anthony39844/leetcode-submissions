@@ -17,7 +17,9 @@ HEADERS = {
     "Content-Type": "application/json",
     "Cookie": f"csrftoken={CSRF_TOKEN}; LEETCODE_SESSION={LEETCODE_SESSION};",
     "X-CSRFToken": CSRF_TOKEN,
-    "Referer": "https://leetcode.com"
+    "Referer": "https://leetcode.com",
+    # Emulate a real modern browser (Chrome on Windows/macOS)
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 }
 
 EXTENSIONS = {
