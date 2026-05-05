@@ -5,7 +5,7 @@ import time
 # --- Configuration ---
 SESSION = os.environ['LEETCODE_SESSION']
 CSRF_TOKEN = os.environ['LEETCODE_CSRF_TOKEN']
-USERNAME = "your_username" 
+USERNAME = "anthony39844" 
 URL = "https://leetcode.com"
 EXTENSIONS = {"python": "py", "python3": "py", "cpp": "cpp", "java": "java", "javascript": "js"}
 
