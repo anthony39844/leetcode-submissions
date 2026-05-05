@@ -1,14 +1,12 @@
 import os
 import requests
 import time
-import datetime
 
 # --- Configuration ---
 SESSION = os.environ['LEETCODE_SESSION']
 CSRF_TOKEN = os.environ['LEETCODE_CSRF_TOKEN']
 USERNAME = "your_username" 
 URL = "https://leetcode.com"
-
 EXTENSIONS = {"python": "py", "python3": "py", "cpp": "cpp", "java": "java", "javascript": "js"}
 
 def call_leetcode(query, variables):
@@ -26,7 +24,7 @@ def get_all_submissions():
         query = """
         query acSubmissions($username: String!, $limit: Int!, $offset: Int!) {
             recentAcSubmissionList(username: $username, limit: $limit, offset: $offset) {
-                id, titleSlug, lang, timestamp, title
+                id, titleSlug, lang, title
             }
         }
         """
@@ -62,29 +60,44 @@ def get_submission_code(submission_id):
 
 # --- Main Logic ---
 submissions = get_all_submissions()
+unique_problems = {}
 
 for sub in submissions:
-    diff, topic, content = get_problem_details(sub['titleSlug'])
-    ext = EXTENSIONS.get(sub['lang'], "txt")
-    
-    # Path construction: Difficulty / Topic / Problem Name
-    folder_path = os.path.join(diff, topic, sub['titleSlug'])
+    slug = sub['titleSlug']
+    if slug not in unique_problems:
+        diff, topic, content = get_problem_details(slug)
+        unique_problems[slug] = {"title": sub['title'], "diff": diff, "topic": topic}
+    else:
+        diff, topic = unique_problems[slug]["diff"], unique_problems[slug]["topic"]
+
+    folder_path = os.path.join(diff, topic, slug)
     os.makedirs(folder_path, exist_ok=True)
     
-    # Save the solution file with ID to avoid overwriting
+    # Save code
+    ext = EXTENSIONS.get(sub['lang'], "txt")
     file_path = os.path.join(folder_path, f"solution_{sub['id']}.{ext}")
     if not os.path.exists(file_path):
-        print(f"Syncing {sub['titleSlug']} (ID: {sub['id']})...")
-        code = get_submission_code(sub['id'])
+        print(f"Syncing {slug}...")
         with open(file_path, "w") as f:
-            f.write(code)
-    
-    # Generate/Update the README.md for this problem
+            f.write(get_submission_code(sub['id']))
+        time.sleep(0.5)
+
+    # Individual README
     readme_path = os.path.join(folder_path, "README.md")
     if not os.path.exists(readme_path):
         with open(readme_path, "w") as f:
-            f.write(f"# {sub['title']}\n\n")
-            f.write(f"**Difficulty:** {diff} | **Topic:** {topic}\n\n")
-            f.write("## Problem Description\n")
-            f.write(content + "\n\n")
-            f.write("---")
+            f.write(f"# {sub['title']}\n\n**Difficulty:** {diff} | **Topic:** {topic}\n\n{content}")
+
+# --- Generate Root README ---
+with open("README.md", "w") as f:
+    f.write(f"# LeetCode Solutions Library\n\n")
+    f.write(f"Total Unique Problems Solved: **{len(unique_problems)}**\n\n")
+    f.write("## Problems by Category\n\n")
+    
+    # Sort for a clean table
+    for slug in sorted(unique_problems.keys()):
+        p = unique_problems[slug]
+        path = f"{p['diff']}/{p['topic']}/{slug}"
+        f.write(f"- [{p['title']}]({path}) ({p['diff']})\n")
+
+print("Sync complete!")
