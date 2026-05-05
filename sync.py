@@ -1,118 +1,125 @@
 import os
-import requests
+import sys
 import time
+import requests
 
-# --- Configuration ---
-SESSION = os.environ['LEETCODE_SESSION']
-CSRF_TOKEN = os.environ['LEETCODE_CSRF_TOKEN']
-USERNAME = "anthony39844" 
-URL = "https://leetcode.com"
-EXTENSIONS = {"python": "py", "python3": "py", "cpp": "cpp", "java": "java", "javascript": "js"}
+# --- Retrieve Configuration from GitHub Secrets ---
+LEETCODE_SESSION = os.getenv("LEETCODE_SESSION")
+CSRF_TOKEN = os.getenv("LEETCODE_CSRF_TOKEN")
 
-def call_leetcode(query, variables):
-    headers = {
-        "Content-Type": "application/json",
-        "X-CSRFToken": CSRF_TOKEN,
-        "Cookie": f"LEETCODE_SESSION={SESSION}; csrftoken={CSRF_TOKEN};",
-        "Referer": "https://leetcode.com",
-        "Origin": "https://leetcode.com",
-        # Use a real browser User-Agent
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "*/*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "x-requested-with": "XMLHttpRequest" # This is often the missing key
-    }
-    
-    resp = requests.post(URL, json={'query': query, 'variables': variables}, headers=headers)
-    
-    if resp.status_code != 200:
-        print(f"Error {resp.status_code} detected.")
-        if "Just a moment" in resp.text:
-            print("Cloudflare is blocking the request. Try refreshing your session cookies.")
-        raise Exception(f"LeetCode API returned status code {resp.status_code}")
-        
-    return resp.json()
+if not LEETCODE_SESSION or not CSRF_TOKEN:
+    print("Error: LEETCODE_SESSION or LEETCODE_CSRF_TOKEN is missing in environment variables.")
+    sys.exit(1)
 
-def get_all_submissions():
-    all_subs, offset, limit = [], 0, 20
-    while True:
-        query = """
-        query acSubmissions($username: String!, $limit: Int!, $offset: Int!) {
-            recentAcSubmissionList(username: $username, limit: $limit, offset: $offset) {
-                id, titleSlug, lang, title
+# --- Constants ---
+BASE_URL = "https://leetcode.com/graphql/"
+HEADERS = {
+    "Content-Type": "application/json",
+    "Cookie": f"csrftoken={CSRF_TOKEN}; LEETCODE_SESSION={LEETCODE_SESSION};",
+    "X-CSRFToken": CSRF_TOKEN,
+    "Referer": "https://leetcode.com"
+}
+
+EXTENSIONS = {
+    "bash": "sh",
+    "c": "c",
+    "cpp": "cpp",
+    "csharp": "cs",
+    "dart": "dart",
+    "golang": "go",
+    "java": "java",
+    "javascript": "js",
+    "kotlin": "kt",
+    "mysql": "sql",
+    "postgresql": "sql",
+    "python": "py",
+    "python3": "py",
+    "ruby": "rb",
+    "rust": "rs",
+    "scala": "scala",
+    "swift": "swift",
+    "typescript": "ts",
+}
+
+def get_accepted_submissions(limit=20):
+    """Fetches the most recent submissions."""
+    query = """
+    query ($offset: Int!, $limit: Int!) {
+        submissionList(offset: $offset, limit: $limit) {
+            submissions {
+                id
+                title
+                titleSlug
+                statusDisplay
+                lang
             }
         }
-        """
-        data = call_leetcode(query, {"username": USERNAME, "limit": limit, "offset": offset})
-        subs = data['data']['recentAcSubmissionList']
-        if not subs: break
-        all_subs.extend(subs)
-        offset += limit
-        time.sleep(0.5) 
-    return all_subs
+    }
+    """
+    variables = {"offset": 0, "limit": limit}
+    try:
+        response = requests.post(BASE_URL, json={"query": query, "variables": variables}, headers=HEADERS)
+        response.raise_for_status()
+        data = response.json()
+        subs = data['data']['submissionList']['submissions']
+        return [s for s in subs if s['statusDisplay'] == 'Accepted']
+    except Exception as e:
+        print(f"Error fetching submission list: {e}")
+        sys.exit(1)
 
-def get_problem_details(title_slug):
+def get_submission_details(submission_id):
+    """Fetches the actual code and question details for a submission."""
     query = """
-    query questionData($titleSlug: String!) {
-        question(titleSlug: $titleSlug) {
-            content, difficulty, topicTags { name }
+    query submissionDetails($submissionId: Int!) {
+        submissionDetails(submissionId: $submissionId) {
+            code
+            question {
+                questionId
+            }
         }
     }
     """
-    data = call_leetcode(query, {"titleSlug": title_slug})
-    q = data['data']['question']
-    topic = q['topicTags'][0]['name'] if q['topicTags'] else "General"
-    return q['difficulty'], topic, q['content']
+    variables = {"submissionId": int(submission_id)}
+    response = requests.post(BASE_URL, json={"query": query, "variables": variables}, headers=HEADERS)
+    return response.json()['data']['submissionDetails']
 
-def get_submission_code(submission_id):
-    query = """
-    query submissionDetails($submissionId: Int!) {
-        submissionDetails(submissionId: $submissionId) { code }
-    }
-    """
-    data = call_leetcode(query, {"submissionId": int(submission_id)})
-    return data['data']['submissionDetails']['code']
-
-# --- Main Logic ---
-submissions = get_all_submissions()
-unique_problems = {}
-
-for sub in submissions:
-    slug = sub['titleSlug']
-    if slug not in unique_problems:
-        diff, topic, content = get_problem_details(slug)
-        unique_problems[slug] = {"title": sub['title'], "diff": diff, "topic": topic}
-    else:
-        diff, topic = unique_problems[slug]["diff"], unique_problems[slug]["topic"]
-
-    folder_path = os.path.join(diff, topic, slug)
-    os.makedirs(folder_path, exist_ok=True)
+def sync_to_local():
+    print("Fetching submissions from LeetCode...")
+    submissions = get_accepted_submissions()
     
-    # Save code
-    ext = EXTENSIONS.get(sub['lang'], "txt")
-    file_path = os.path.join(folder_path, f"solution_{sub['id']}.{ext}")
-    if not os.path.exists(file_path):
-        print(f"Syncing {slug}...")
-        with open(file_path, "w") as f:
-            f.write(get_submission_code(sub['id']))
-        time.sleep(0.5)
+    if not submissions:
+        print("No accepted submissions found.")
+        return
 
-    # Individual README
-    readme_path = os.path.join(folder_path, "README.md")
-    if not os.path.exists(readme_path):
-        with open(readme_path, "w") as f:
-            f.write(f"# {sub['title']}\n\n**Difficulty:** {diff} | **Topic:** {topic}\n\n{content}")
+    for sub in submissions:
+        print(f"Processing: {sub['title']}...")
+        
+        # Avoid hitting LeetCode rate limits
+        time.sleep(1)
+        
+        # 1. Fetch submission code details
+        try:
+            details = get_submission_details(sub['id'])
+            if not details or 'code' not in details:
+                continue
+        except Exception as e:
+            print(f"Failed to fetch details for submission {sub['id']}: {e}")
+            continue
 
-# --- Generate Root README ---
-with open("README.md", "w") as f:
-    f.write(f"# LeetCode Solutions Library\n\n")
-    f.write(f"Total Unique Problems Solved: **{len(unique_problems)}**\n\n")
-    f.write("## Problems by Category\n\n")
-    
-    # Sort for a clean table
-    for slug in sorted(unique_problems.keys()):
-        p = unique_problems[slug]
-        path = f"{p['diff']}/{p['topic']}/{slug}"
-        f.write(f"- [{p['title']}]({path}) ({p['diff']})\n")
+        # 2. Structure folder path: "0001-two-sum"
+        qid_padded = str(details['question']['questionId']).zfill(4)
+        folder_name = f"{qid_padded}-{sub['titleSlug']}"
+        os.makedirs(folder_name, exist_ok=True)
+        
+        # 3. Determine file extension
+        ext = EXTENSIONS.get(sub['lang'], "txt")
+        file_path = os.path.join(folder_name, f"solution.{ext}")
+        
+        # 4. Write the file to disk
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(details['code'] + "\n")
+            
+        print(f"Saved: {file_path}")
 
-print("Sync complete!")
+if __name__ == "__main__":
+    sync_to_local()
