@@ -153,7 +153,7 @@ def sync_to_local():
         
         already_exists = False
         # Fast local search to see if we already downloaded this exact file in any of our folders
-        for root_folder in ["solutions-all", "solutions-difficulty"]:
+        for root_folder in ["solutions", "solutions-difficulty"]:
             if os.path.exists(root_folder):
                 for root, dirs, files in os.walk(root_folder):
                     if f"{filename}.{ext}" in files and root.endswith(title_slug):
