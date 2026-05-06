@@ -242,7 +242,6 @@ def generate_readme_stats():
     easy_count = 0
     medium_count = 0
     hard_count = 0
-    total_unique = 0
 
     # Scan solutions-difficulty to dynamically count unique problems solved per difficulty level
     diff_path = "solutions-difficulty"
@@ -274,30 +273,37 @@ def generate_readme_stats():
     )
 
     readme_file = "README.md"
-    if not os.path.exists(readme_file):
-        # Create an empty README with the boundary comments if it doesn't exist
-        with open(readme_file, "w") as f:
-            f.write("# LeetCode Submissions\n\n\n")
-
-    # Read the current contents of the README
-    with open(readme_file, "r") as f:
-        content = f.read()
-
-    # Locate the tags and inject the new statistics
     start_tag = ""
     end_tag = ""
 
-    if start_tag in content and end_tag in content:
-        before = content.split(start_tag)[0]
-        after = content.split(end_tag)[1]
+    # 1. Ensure README exists and has the tags
+    if not os.path.exists(readme_file):
+        with open(readme_file, "w", encoding="utf-8") as f:
+            f.write(f"# LeetCode Submissions\n\n{start_tag}\n{end_tag}\n")
+
+    # 2. Read current content
+    with open(readme_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # 3. If the tags are missing, append them to the end of the file safely
+    if start_tag not in content or end_tag not in content:
+        print("Warning: Boundary tags missing from README.md. Appending them now...")
+        content = content.rstrip() + f"\n\n{start_tag}\n{end_tag}\n"
+
+    # 4. Safely extract and slice using find() instead of split()
+    start_idx = content.find(start_tag)
+    end_idx = content.find(end_tag)
+
+    if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
+        before = content[:start_idx + len(start_tag)]
+        after = content[end_idx:]
+        new_content = f"{before}\n\n{stats_markdown}\n{after}"
         
-        new_content = f"{before}{start_tag}\n\n{stats_markdown}\n{end_tag}{after}"
-        
-        with open(readme_file, "w") as f:
+        with open(readme_file, "w", encoding="utf-8") as f:
             f.write(new_content)
         print("README.md successfully updated with latest statistics!")
     else:
-        print("Warning: Boundary tags missing from README.md. Statistics could not be updated.")
+        print("Error: Could not update README.md statistics due to invalid tag ordering.")
 
 
 def sync_to_local():
