@@ -255,18 +255,20 @@ def sync_submission(sub):
 
 
 def generate_readme_stats():
-    """Scans local folders to count solved problems by difficulty and writes stats directly to README.md."""
+    """Scans local folders and completely overwrites README.md with fresh progress stats."""
     print("Generating README statistics...")
     
     easy_count = 0
     medium_count = 0
     hard_count = 0
 
+    # 1. Scan your directory structure to count unique problems solved
     diff_path = "solutions-difficulty"
     if os.path.exists(diff_path):
         for diff_level in ["Easy", "Medium", "Hard"]:
             level_folder = os.path.join(diff_path, diff_level)
             if os.path.exists(level_folder):
+                # Count directories, which represent individual problems
                 problems = [d for d in os.listdir(level_folder) if os.path.isdir(os.path.join(level_folder, d))]
                 if diff_level == "Easy":
                     easy_count = len(problems)
@@ -277,45 +279,36 @@ def generate_readme_stats():
 
     total_unique = easy_count + medium_count + hard_count
 
-    stats_markdown = (
-        "### 📊 Progress Statistics\n\n"
-        f"| Difficulty | Solved Count |\n"
-        f"| :--- | :---: |\n"
-        f"| 🟢 Easy | **{easy_count}** |\n"
-        f"| 🟡 Medium | **{medium_count}** |\n"
-        f"| 🔴 Hard | **{hard_count}** |\n"
-        f"| **Total** | **{total_unique}** |\n\n"
-        f"*Last updated: {datetime.now(CST_TZ).strftime('%Y-%m-%d %I:%M %p')} (Central Time)*\n"
-    )
+    # 2. Build the entire README content from scratch
+    readme_content = f"""# LeetCode Submissions 🚀
 
+My automated system for tracking solved LeetCode problems, categorized by difficulty.
+
+### 📊 Progress Statistics
+
+| Difficulty | Solved Count |
+| :--- | :---: |
+| 🟢 Easy | **{easy_count}** |
+| 🟡 Medium | **{medium_count}** |
+| 🔴 Hard | **{hard_count}** |
+| **Total** | **{total_unique}** |
+
+*Last updated: {datetime.now(CST_TZ).strftime('%Y-%m-%d %I:%M %p')} (Central Time)*
+
+## 📂 Repository Structure
+
+* **`solutions/`**: A flat directory containing all solved problems named by their completion timestamp.
+* **`solutions-difficulty/`**: Solutions organized dynamically into `Easy`, `Medium`, and `Hard` folders.
+"""
+
+    # 3. Completely overwrite the file
     readme_file = "README.md"
-    start_tag = ""
-    end_tag = ""
-
-    if not os.path.exists(readme_file):
+    try:
         with open(readme_file, "w", encoding="utf-8") as f:
-            f.write(f"# LeetCode Submissions\n\n{start_tag}\n{end_tag}\n")
-
-    with open(readme_file, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    if start_tag not in content or end_tag not in content:
-        print("Warning: Boundary tags missing from README.md. Appending them now...")
-        content = content.rstrip() + f"\n\n{start_tag}\n{end_tag}\n"
-
-    start_idx = content.find(start_tag)
-    end_idx = content.find(end_tag)
-
-    if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
-        before = content[:start_idx + len(start_tag)]
-        after = content[end_idx:]
-        new_content = f"{before}\n\n{stats_markdown}\n{after}"
-        
-        with open(readme_file, "w", encoding="utf-8") as f:
-            f.write(new_content)
-        print("README.md successfully updated with latest statistics!")
-    else:
-        print("Error: Could not update README.md statistics due to invalid tag ordering.")
+            f.write(readme_content)
+        print("README.md successfully regenerated with latest statistics!")
+    except Exception as e:
+        print(f"Error writing README.md: {e}")
 
 
 def sync_to_local():
