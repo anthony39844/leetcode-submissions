@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import requests
 
 # --- Retrieve Configuration from GitHub Secrets ---
@@ -43,11 +44,23 @@ EXTENSIONS = {
     "typescript": "ts",
 }
 
-def get_accepted_submissions(limit=20):
-    """Fetches the most recent submissions with timestamps."""
+# Timezone configurations
+UTC_TZ = ZoneInfo("UTC")
+CST_TZ = ZoneInfo("America/Chicago")
+
+
+def get_all_accepted_submissions():
+    """Paginate through all historical LeetCode submissions to fetch all accepted entries."""
+    print("Starting collection of all accepted submissions...")
+    all_accepted = []
+    offset = 0
+    limit = 20
+    has_next = True
+
     query = """
     query ($offset: Int!, $limit: Int!) {
         submissionList(offset: $offset, limit: $limit) {
+            hasNext
             submissions {
                 id
                 title
@@ -59,19 +72,35 @@ def get_accepted_submissions(limit=20):
         }
     }
     """
-    variables = {"offset": 0, "limit": limit}
-    try:
-        response = requests.post(BASE_URL, json={"query": query, "variables": variables}, headers=HEADERS)
-        response.raise_for_status()
-        data = response.json()
-        subs = data['data']['submissionList']['submissions']
-        return [s for s in subs if s['statusDisplay'] == 'Accepted']
-    except Exception as e:
-        print(f"Error fetching submission list: {e}")
-        sys.exit(1)
+
+    while has_next:
+        print(f"Fetching offset {offset}...")
+        variables = {"offset": offset, "limit": limit}
+        try:
+            response = requests.post(BASE_URL, json={"query": query, "variables": variables}, headers=HEADERS)
+            response.raise_for_status()
+            data = response.json()
+            
+            sub_list = data['data']['submissionList']
+            submissions = sub_list['submissions']
+            has_next = sub_list['hasNext']
+            
+            # Filter and store only accepted solutions
+            accepted_batch = [s for s in submissions if s['statusDisplay'] == 'Accepted']
+            all_accepted.extend(accepted_batch)
+            
+            offset += limit
+            time.sleep(1)  # Mild rate-limiting guard rails
+        except Exception as e:
+            print(f"Error pagination failed at offset {offset}: {e}")
+            break
+
+    print(f"Completed fetching. Found {len(all_accepted)} total accepted submissions.")
+    return all_accepted
+
 
 def get_submission_details(submission_id):
-    """Fetches code, questionId, difficulty, and topic tags."""
+    """Fetches submission source code, difficulty, and topic tags."""
     query = """
     query submissionDetails($submissionId: Int!) {
         submissionDetails(submissionId: $submissionId) {
@@ -90,29 +119,47 @@ def get_submission_details(submission_id):
     response = requests.post(BASE_URL, json={"query": query, "variables": variables}, headers=HEADERS)
     return response.json()['data']['submissionDetails']
 
+
+def get_cst_filename(unix_timestamp):
+    """Converts a UTC timestamp to US Central Time (CST/CDT) and formats it as a 12-hour AM/PM filename."""
+    utc_dt = datetime.fromtimestamp(int(unix_timestamp), tz=UTC_TZ)
+    cst_dt = utc_dt.astimezone(CST_TZ)
+    # %I is 12-hour hour (01-12)
+    # %p is AM/PM indicator
+    return cst_dt.strftime("%Y-%m-%d_%I-%M-%S-%p")
+
+
 def save_code_to_path(folder_path, filename, ext, code):
-    """Helper to safely create directories and write files."""
+    """Saves solution content safely to disk."""
     os.makedirs(folder_path, exist_ok=True)
     file_path = os.path.join(folder_path, f"{filename}.{ext}")
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(code + "\n")
-    print(f"  Saved: {file_path}")
+
 
 def sync_to_local():
-    print("Fetching submissions from LeetCode...")
-    submissions = get_accepted_submissions()
-    
+    submissions = get_all_accepted_submissions()
     if not submissions:
-        print("No accepted submissions found.")
+        print("No accepted submissions found to sync.")
         return
 
     for sub in submissions:
-        print(f"Processing: {sub['title']}...")
+        ext = EXTENSIONS.get(sub['lang'], "txt")
+        filename = get_cst_filename(sub['timestamp'])
         
-        # Avoid hitting LeetCode rate limits
-        time.sleep(1)
+        # Look ahead calculation to check for existing duplicates across locations
+        # We temporarily format folder path name just to check if it's already on disk.
+        # This saves LeetCode API call quotas by verifying local status first.
+        title_slug = sub['titleSlug']
         
-        # 1. Fetch submission code and metadata
+        # We need the question details to construct the true folder paths. 
+        # But we don't have the questionId yet without an API hit.
+        # Optimization: Call details only if needed, or bypass check if not fetched before.
+        print(f"Processing submission #{sub['id']} for {sub['title']}...")
+        
+        # Limit API calls to preserve quotas
+        time.sleep(1.5)
+        
         try:
             details = get_submission_details(sub['id'])
             if not details or 'code' not in details:
@@ -121,34 +168,36 @@ def sync_to_local():
             print(f"Failed to fetch details for submission {sub['id']}: {e}")
             continue
 
-        # 2. Extract metadata
         question_data = details['question']
         qid_padded = str(question_data['questionId']).zfill(4)
         difficulty = question_data.get('difficulty', 'Unknown')
         tags = [tag['slug'] for tag in question_data.get('topicTags', []) if tag.get('slug')]
-        
-        # 3. Format Submission Timestamp to a safe filename: YYYY-MM-DD_HH-MM-SS
-        submission_time = datetime.fromtimestamp(int(sub['timestamp']))
-        filename = submission_time.strftime("%Y-%m-%d_%H-%M-%S")
-        
-        ext = EXTENSIONS.get(sub['lang'], "txt")
-        question_folder_name = f"{qid_padded}-{sub['titleSlug']}"
+        question_folder_name = f"{qid_padded}-{title_slug}"
 
-        # 4. Save structured by Topic Tag (Falls back to Difficulty if no tags exist)
+        # Setup destination folders
+        difficulty_folder = os.path.join("solutions-difficulty", difficulty, question_folder_name)
+        difficulty_file_path = os.path.join(difficulty_folder, f"{filename}.{ext}")
+
+        # Check if we already have this submission saved in difficulty
+        if os.path.exists(difficulty_file_path):
+            print(f"  Skipping: Submission from {filename} already exists locally.")
+            continue
+
+        # Save to solutions-difficulty
+        save_code_to_path(difficulty_folder, filename, ext, details['code'])
+        print(f"  Saved to solutions-difficulty: {difficulty_file_path}")
+
+        # Save to solutions-categories
         if tags:
             for tag in tags:
-                # Structure: solutions/topic_tags/tag-name/0001-two-sum/2026-05-05_22-58-35.py
-                folder_path = os.path.join("solutions", tag, question_folder_name)
-                save_code_to_path(folder_path, filename, ext, details['code'])
+                category_folder = os.path.join("solutions-categories", tag, question_folder_name)
+                save_code_to_path(category_folder, filename, ext, details['code'])
+                print(f"  Saved to solutions-categories ({tag}): {filename}.{ext}")
         else:
-            # Fallback to solutions/uncategorized/0001-two-sum/...
-            folder_path = os.path.join("solutions", "uncategorized", question_folder_name)
-            save_code_to_path(folder_path, filename, ext, details['code'])
+            uncat_folder = os.path.join("solutions-categories", "uncategorized", question_folder_name)
+            save_code_to_path(uncat_folder, filename, ext, details['code'])
+            print(f"  Saved to solutions-categories (uncategorized): {filename}.{ext}")
 
-        # 5. Save structured strictly by Difficulty (Always saved here too for easy browsing)
-        # Structure: solutions/difficulty/Easy/0001-two-sum/2026-05-05_22-58-35.py
-        difficulty_path = os.path.join("solutions", "difficulty", difficulty, question_folder_name)
-        save_code_to_path(difficulty_path, filename, ext, details['code'])
 
 if __name__ == "__main__":
     sync_to_local()
