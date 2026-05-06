@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import shutil
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import requests
@@ -47,6 +48,7 @@ EXTENSIONS = {
 # Timezone configurations
 UTC_TZ = ZoneInfo("UTC")
 CST_TZ = ZoneInfo("America/Chicago")
+REQUIRED_FOLDERS = ["solutions", "solutions-difficulty"]
 
 
 def get_all_accepted_submissions():
@@ -100,7 +102,7 @@ def get_all_accepted_submissions():
 
 
 def get_submission_details(submission_id):
-    """Fetches submission source code, difficulty, and topic tags."""
+    """Fetches submission source code and difficulty."""
     query = """
     query submissionDetails($submissionId: Int!) {
         submissionDetails(submissionId: $submissionId) {
@@ -108,9 +110,6 @@ def get_submission_details(submission_id):
             question {
                 questionId
                 difficulty
-                topicTags {
-                    slug
-                }
             }
         }
     }
@@ -135,16 +134,12 @@ def save_code_to_path(folder_path, filename, ext, code):
         f.write(code + "\n")
 
 
-import os
-import shutil
-
-# --- Configuration ---
-REQUIRED_FOLDERS = ["solutions", "solutions-difficulty"]
-
 def sync_submission(sub):
     title_slug = sub['titleSlug']
-    filename = sub['timestamp_filename']  # Assuming this is your unique timestamp filename
-    ext = sub['extension']                # e.g., "py", "cpp", "java"
+    
+    # Deriving file name and file extension from raw submission metadata
+    filename = get_cst_filename(sub['timestamp'])
+    ext = EXTENSIONS.get(sub['lang'], "txt")
     full_filename = f"{filename}.{ext}"
 
     # Track where the file is found during our local scan
@@ -186,7 +181,8 @@ def sync_submission(sub):
 
         elif not exists_in_difficulty:
             # We need to copy from solutions -> solutions-difficulty
-            # To do this, we extract the difficulty level from the submission metadata
+            # Since we didn't call the API yet, we try to grab the difficulty level 
+            # from sub dict or fallback to 'Unknown'
             difficulty = sub.get('difficulty', 'Unknown')
             dest_folder = os.path.join("solutions-difficulty", difficulty, question_folder_name)
             os.makedirs(dest_folder, exist_ok=True)
@@ -198,8 +194,7 @@ def sync_submission(sub):
     # --- Case 3: API Fallback (Missing entirely) ---
     print(f"Processing submission #{sub['id']} for {sub['title']} (Calling API)...")
     
-    # Simulate / execute your API limit delay
-    import time
+    # Respect LeetCode's rate limits
     time.sleep(1.5)  
     
     try:
@@ -214,7 +209,6 @@ def sync_submission(sub):
     question_data = details['question']
     qid_padded = str(question_data['questionId']).zfill(4)
     difficulty = question_data.get('difficulty', 'Unknown')
-    tags = [tag['slug'] for tag in question_data.get('topicTags', []) if tag.get('slug')]
     question_folder_name = f"{qid_padded}-{title_slug}"
 
     # Save to 'solutions' (flat structure)
@@ -227,24 +221,15 @@ def sync_submission(sub):
     save_code_to_path(difficulty_folder, filename, ext, details['code'])
     print(f"  Saved to solutions-difficulty: {full_filename}")
 
-    # Save to 'solutions-categories' (always dynamic, handled only on API fetch)
-    if tags:
-        for tag in tags:
-            category_folder = os.path.join("solutions-categories", tag, question_folder_name)
-            save_code_to_path(category_folder, filename, ext, details['code'])
-            print(f"  Saved to solutions-categories ({tag}): {full_filename}")
-    else:
-        uncat_folder = os.path.join("solutions-categories", "uncategorized", question_folder_name)
-        save_code_to_path(uncat_folder, filename, ext, details['code'])
-        print(f"  Saved to solutions-categories (uncategorized): {full_filename}")
 
 def sync_to_local():
-    # 1. Fetch your submissions list from the API using the correct function name
+    # 1. Fetch your submissions list from the API
     submissions = get_all_accepted_submissions() 
     
     # 2. Process each one using our optimized function
     for sub in submissions:
         sync_submission(sub)
-        
+
+
 if __name__ == "__main__":
     sync_to_local()
