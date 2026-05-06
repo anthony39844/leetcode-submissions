@@ -1,0 +1,26 @@
+class Solution:
+    def convert(self, s: str, numRows: int) -> str:
+        if numRows == 1 or numRows >= len(s):
+            return s
+        pattern = (numRows - 1) * 2
+        out = ""
+        row = 0
+        while row < numRows:
+            index = row
+            while index < len(s):
+                if row == 0 or row == numRows - 1:
+                    out += s[index]
+                    index += pattern
+                else:
+                    out += s[index]
+                    index += pattern - (row * 2)
+                    if index >= len(s):
+                        break
+                    out += s[index]
+                    index += row * 2
+
+            row += 1
+
+        return out
+            
+
