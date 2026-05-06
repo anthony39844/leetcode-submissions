@@ -255,20 +255,19 @@ def sync_submission(sub):
 
 
 def generate_readme_stats():
-    """Scans local folders and completely overwrites README.md with fresh progress stats."""
+    """Reads existing README, calculates daily delta, and appends to the history log at the bottom."""
     print("Generating README statistics...")
     
     easy_count = 0
     medium_count = 0
     hard_count = 0
 
-    # 1. Scan your directory structure to count unique problems solved
+    # 1. Scan your directory structure to count unique problems solved right now
     diff_path = "solutions-difficulty"
     if os.path.exists(diff_path):
         for diff_level in ["Easy", "Medium", "Hard"]:
             level_folder = os.path.join(diff_path, diff_level)
             if os.path.exists(level_folder):
-                # Count directories, which represent individual problems
                 problems = [d for d in os.listdir(level_folder) if os.path.isdir(os.path.join(level_folder, d))]
                 if diff_level == "Easy":
                     easy_count = len(problems)
@@ -278,8 +277,72 @@ def generate_readme_stats():
                     hard_count = len(problems)
 
     total_unique = easy_count + medium_count + hard_count
+    today_str = datetime.now(CST_TZ).strftime('%Y-%m-%d')
 
-    # 2. Build the entire README content from scratch
+    # 2. Read the existing README to parse historical numbers and extract the log
+    readme_file = "README.md"
+    existing_history = []
+    prev_easy, prev_medium, prev_hard = 0, 0, 0
+
+    if os.path.exists(readme_file):
+        with open(readme_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        
+        # Extract previous stats to calculate today's progress
+        for line in lines:
+            if "🟢 Easy" in line:
+                try: prev_easy = int(line.split("**")[1])
+                except: pass
+            elif "🟡 Medium" in line:
+                try: prev_medium = int(line.split("**")[1])
+                except: pass
+            elif "🔴 Hard" in line:
+                try: prev_hard = int(line.split("**")[1])
+                except: pass
+
+        # --- BOTTOM-OF-FILE LOG GATHERING ---
+        # Everything after our heading is treated as a log entry
+        inside_log = False
+        for line in lines:
+            if "### 📈 Daily History Log" in line:
+                inside_log = True
+                continue
+            if inside_log:
+                if line.strip().startswith("* **"):
+                    existing_history.append(line.strip())
+
+    # 3. Calculate today's delta
+    delta_easy = max(0, easy_count - prev_easy)
+    delta_medium = max(0, medium_count - prev_medium)
+    delta_hard = max(0, hard_count - prev_hard)
+    total_delta = delta_easy + delta_medium + delta_hard
+
+    # 4. Format today's log entry
+    new_history_list = list(existing_history)
+    if total_delta > 0:
+        today_prefix = f"* **{today_str}:**"
+        # Deduplicate: if we run this multiple times today, replace the earlier run's entry
+        new_history_list = [item for item in new_history_list if not item.startswith(today_prefix)]
+        
+        details = []
+        if delta_easy > 0: details.append(f"+{delta_easy} Easy")
+        if delta_medium > 0: details.append(f"+{delta_medium} Medium")
+        if delta_hard > 0: details.append(f"+{delta_hard} Hard")
+        details_str = f" ({', '.join(details)})" if details else ""
+        
+        plural_suffix = "s" if total_delta > 1 else ""
+        today_entry = f"{today_prefix} Solved {total_delta} problem{plural_suffix}{details_str}"
+        
+        # Prepend to the top of the history list so newest dates are always on top
+        new_history_list.insert(0, today_entry)
+
+    # If no history exists at all yet, create a starting entry
+    if not new_history_list:
+        new_history_list.append(f"* **{today_str}:** Started tracking! Solved {total_unique} total problems.")
+
+    history_block = "### 📈 Daily History Log\n\n" + "\n".join(new_history_list) + "\n"
+
+    # 5. Completely assemble the README (Structure is now on top!)
     readme_content = f"""# LeetCode Submissions 🚀
 
 My automated system for tracking solved LeetCode problems, categorized by difficulty.
@@ -299,14 +362,14 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 
 * **`solutions/`**: A flat directory containing all solved problems named by their completion timestamp.
 * **`solutions-difficulty/`**: Solutions organized dynamically into `Easy`, `Medium`, and `Hard` folders.
-"""
 
-    # 3. Completely overwrite the file
-    readme_file = "README.md"
+{history_block}"""
+
+    # 6. Overwrite the file
     try:
         with open(readme_file, "w", encoding="utf-8") as f:
             f.write(readme_content)
-        print("README.md successfully regenerated with latest statistics!")
+        print("README.md successfully updated with History Log at the bottom!")
     except Exception as e:
         print(f"Error writing README.md: {e}")
 
