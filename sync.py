@@ -238,5 +238,13 @@ def sync_submission(sub):
         save_code_to_path(uncat_folder, filename, ext, details['code'])
         print(f"  Saved to solutions-categories (uncategorized): {full_filename}")
 
+def sync_to_local():
+    # 1. Fetch your submissions list from the API
+    submissions = get_all_submissions() 
+    
+    # 2. Process each one using our optimized function
+    for sub in submissions:
+        sync_submission(sub)
+        
 if __name__ == "__main__":
-    sync_submission()
+    sync_to_local()
