@@ -48,7 +48,19 @@ EXTENSIONS = {
 # Timezone configurations
 UTC_TZ = ZoneInfo("UTC")
 CST_TZ = ZoneInfo("America/Chicago")
-REQUIRED_FOLDERS = ["solutions", "solutions-difficulty"]
+
+# --- Dynamic Configuration ---
+# Restructure your workspace simply by editing this list!
+REQUIRED_FOLDERS = [
+    {
+        "name": "solutions",
+        "has_dynamic_subfolder": False
+    },
+    {
+        "name": "solutions-difficulty",
+        "has_dynamic_subfolder": True  # Instructs the script to inject the difficulty subfolder
+    }
+]
 
 
 def get_all_accepted_submissions():
@@ -137,16 +149,17 @@ def save_code_to_path(folder_path, filename, ext, code):
 def sync_submission(sub):
     title_slug = sub['titleSlug']
     
-    # Deriving file name and file extension from raw submission metadata
+    # Correctly derive the filename using the raw 'timestamp' from the API payload
     filename = get_cst_filename(sub['timestamp'])
     ext = EXTENSIONS.get(sub['lang'], "txt")
     full_filename = f"{filename}.{ext}"
 
     # Track where the file is found during our local scan
-    found_paths = {folder: None for folder in REQUIRED_FOLDERS}
+    found_paths = {folder['name']: None for folder in REQUIRED_FOLDERS}
 
-    # 1. Scan local directories to find if and where the file already exists
-    for root_folder in REQUIRED_FOLDERS:
+    # 1. Scan local directories dynamically based on REQUIRED_FOLDERS config
+    for folder_config in REQUIRED_FOLDERS:
+        root_folder = folder_config['name']
         if os.path.exists(root_folder):
             for root, dirs, files in os.walk(root_folder):
                 # Ensure we match the exact filename inside the correct problem folder
@@ -154,37 +167,35 @@ def sync_submission(sub):
                     found_paths[root_folder] = os.path.join(root, full_filename)
                     break
 
-    # Determine the status based on our scan
-    exists_in_solutions = found_paths["solutions"] is not None
-    exists_in_difficulty = found_paths["solutions-difficulty"] is not None
+    # Determine which folders are missing the file
+    missing_folders = [f for f in REQUIRED_FOLDERS if found_paths[f['name']] is None]
+    found_folders = [f for f in REQUIRED_FOLDERS if found_paths[f['name']] is not None]
 
     # --- Case 1: Already completely synced ---
-    if exists_in_solutions and exists_in_difficulty:
-        print(f"  Skipping: '{full_filename}' already exists in all required folders.")
+    if not missing_folders:
+        print(f"  Skipping: '{full_filename}' already exists in all configured folders.")
         return
 
-    # --- Case 2: Local Copy Optimization (One exists, the other is missing) ---
-    if exists_in_solutions or exists_in_difficulty:
+    # --- Case 2: Local Copy Optimization (Found in at least one folder) ---
+    if len(found_folders) > 0:
         print(f"  Optimizing: Local copy detected for '{full_filename}'. Bypassing API...")
         
-        # Determine the question folder name (e.g., "0001-two-sum") from the existing path
-        existing_path = found_paths["solutions"] or found_paths["solutions-difficulty"]
+        # Grab the path of any existing local copy
+        existing_path = found_paths[found_folders[0]['name']]
         path_parts = os.path.normpath(existing_path).split(os.sep)
-        question_folder_name = path_parts[-2]  # The folder right above the file
+        question_folder_name = path_parts[-2]  # Extract e.g., "0001-two-sum"
 
-        if not exists_in_solutions:
-            # We need to copy from solutions-difficulty -> solutions
-            dest_folder = os.path.join("solutions", question_folder_name)
-            os.makedirs(dest_folder, exist_ok=True)
-            shutil.copy2(existing_path, os.path.join(dest_folder, full_filename))
-            print(f"    -> Copied locally to: {dest_folder}")
-
-        elif not exists_in_difficulty:
-            # We need to copy from solutions -> solutions-difficulty
-            # Since we didn't call the API yet, we try to grab the difficulty level 
-            # from sub dict or fallback to 'Unknown'
-            difficulty = sub.get('difficulty', 'Unknown')
-            dest_folder = os.path.join("solutions-difficulty", difficulty, question_folder_name)
+        # Dynamically copy to all missing folders
+        for folder_config in missing_folders:
+            dest_root = folder_config['name']
+            
+            if folder_config['has_dynamic_subfolder']:
+                # Dynamically construct the subfolder path using the submission's difficulty
+                difficulty = sub.get('difficulty', 'Unknown')
+                dest_folder = os.path.join(dest_root, difficulty, question_folder_name)
+            else:
+                dest_folder = os.path.join(dest_root, question_folder_name)
+                
             os.makedirs(dest_folder, exist_ok=True)
             shutil.copy2(existing_path, os.path.join(dest_folder, full_filename))
             print(f"    -> Copied locally to: {dest_folder}")
@@ -194,7 +205,7 @@ def sync_submission(sub):
     # --- Case 3: API Fallback (Missing entirely) ---
     print(f"Processing submission #{sub['id']} for {sub['title']} (Calling API)...")
     
-    # Respect LeetCode's rate limits
+    # Respect rate limits
     time.sleep(1.5)  
     
     try:
@@ -211,15 +222,17 @@ def sync_submission(sub):
     difficulty = question_data.get('difficulty', 'Unknown')
     question_folder_name = f"{qid_padded}-{title_slug}"
 
-    # Save to 'solutions' (flat structure)
-    all_folder = os.path.join("solutions", question_folder_name)
-    save_code_to_path(all_folder, filename, ext, details['code'])
-    print(f"  Saved to solutions: {full_filename}")
-
-    # Save to 'solutions-difficulty'
-    difficulty_folder = os.path.join("solutions-difficulty", difficulty, question_folder_name)
-    save_code_to_path(difficulty_folder, filename, ext, details['code'])
-    print(f"  Saved to solutions-difficulty: {full_filename}")
+    # Loop through REQUIRED_FOLDERS config dynamically to save the API data
+    for folder_config in REQUIRED_FOLDERS:
+        dest_root = folder_config['name']
+        
+        if folder_config['has_dynamic_subfolder']:
+            dest_folder = os.path.join(dest_root, difficulty, question_folder_name)
+        else:
+            dest_folder = os.path.join(dest_root, question_folder_name)
+            
+        save_code_to_path(dest_folder, filename, ext, details['code'])
+        print(f"  Saved to {dest_root}: {full_filename}")
 
 
 def sync_to_local():
