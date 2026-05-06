@@ -239,8 +239,8 @@ def sync_submission(sub):
         print(f"  Saved to solutions-categories (uncategorized): {full_filename}")
 
 def sync_to_local():
-    # 1. Fetch your submissions list from the API
-    submissions = get_all_submissions() 
+    # 1. Fetch your submissions list from the API using the correct function name
+    submissions = get_all_accepted_submissions() 
     
     # 2. Process each one using our optimized function
     for sub in submissions:
