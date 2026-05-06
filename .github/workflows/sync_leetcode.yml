@@ -3,7 +3,10 @@ on:
   workflow_dispatch: # Allows manual run
   schedule:
     - cron: "0 0 * * *" # Runs daily
-
+    
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  
 jobs:
   build:
     runs-on: ubuntu-latest
