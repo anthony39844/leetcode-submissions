@@ -135,75 +135,108 @@ def save_code_to_path(folder_path, filename, ext, code):
         f.write(code + "\n")
 
 
-def sync_to_local():
-    submissions = get_all_accepted_submissions()
-    if not submissions:
-        print("No accepted submissions found to sync.")
+import os
+import shutil
+
+# --- Configuration ---
+REQUIRED_FOLDERS = ["solutions", "solutions-difficulty"]
+
+def sync_submission(sub):
+    title_slug = sub['titleSlug']
+    filename = sub['timestamp_filename']  # Assuming this is your unique timestamp filename
+    ext = sub['extension']                # e.g., "py", "cpp", "java"
+    full_filename = f"{filename}.{ext}"
+
+    # Track where the file is found during our local scan
+    found_paths = {folder: None for folder in REQUIRED_FOLDERS}
+
+    # 1. Scan local directories to find if and where the file already exists
+    for root_folder in REQUIRED_FOLDERS:
+        if os.path.exists(root_folder):
+            for root, dirs, files in os.walk(root_folder):
+                # Ensure we match the exact filename inside the correct problem folder
+                if full_filename in files and root.endswith(title_slug):
+                    found_paths[root_folder] = os.path.join(root, full_filename)
+                    break
+
+    # Determine the status based on our scan
+    exists_in_solutions = found_paths["solutions"] is not None
+    exists_in_difficulty = found_paths["solutions-difficulty"] is not None
+
+    # --- Case 1: Already completely synced ---
+    if exists_in_solutions and exists_in_difficulty:
+        print(f"  Skipping: '{full_filename}' already exists in all required folders.")
         return
 
-    for sub in submissions:
-        ext = EXTENSIONS.get(sub['lang'], "txt")
-        filename = get_cst_filename(sub['timestamp'])
-        title_slug = sub['titleSlug']
+    # --- Case 2: Local Copy Optimization (One exists, the other is missing) ---
+    if exists_in_solutions or exists_in_difficulty:
+        print(f"  Optimizing: Local copy detected for '{full_filename}'. Bypassing API...")
         
-        # We temporarily need to construct the folder name.
-        # Since we don't have the question ID yet, we check the directory structure first.
-        # However, to avoid calling the API, we can search if ANY directory ending with '-{title_slug}'
-        # already contains our '{filename}.{ext}'. 
+        # Determine the question folder name (e.g., "0001-two-sum") from the existing path
+        existing_path = found_paths["solutions"] or found_paths["solutions-difficulty"]
+        path_parts = os.path.normpath(existing_path).split(os.sep)
+        question_folder_name = path_parts[-2]  # The folder right above the file
+
+        if not exists_in_solutions:
+            # We need to copy from solutions-difficulty -> solutions
+            dest_folder = os.path.join("solutions", question_folder_name)
+            os.makedirs(dest_folder, exist_ok=True)
+            shutil.copy2(existing_path, os.path.join(dest_folder, full_filename))
+            print(f"    -> Copied locally to: {dest_folder}")
+
+        elif not exists_in_difficulty:
+            # We need to copy from solutions -> solutions-difficulty
+            # To do this, we extract the difficulty level from the submission metadata
+            difficulty = sub.get('difficulty', 'Unknown')
+            dest_folder = os.path.join("solutions-difficulty", difficulty, question_folder_name)
+            os.makedirs(dest_folder, exist_ok=True)
+            shutil.copy2(existing_path, os.path.join(dest_folder, full_filename))
+            print(f"    -> Copied locally to: {dest_folder}")
         
-        already_exists = False
-        # Fast local search to see if we already downloaded this exact file in any of our folders
-        for root_folder in ["solutions", "solutions-difficulty"]:
-            if os.path.exists(root_folder):
-                for root, dirs, files in os.walk(root_folder):
-                    if f"{filename}.{ext}" in files and root.endswith(title_slug):
-                        already_exists = True
-                        break
-            if already_exists:
-                break
+        return
 
-        if already_exists:
-            print(f"Skipping: Submission from {filename} for {sub['title']} already exists locally.")
-            continue
+    # --- Case 3: API Fallback (Missing entirely) ---
+    print(f"Processing submission #{sub['id']} for {sub['title']} (Calling API)...")
+    
+    # Simulate / execute your API limit delay
+    import time
+    time.sleep(1.5)  
+    
+    try:
+        details = get_submission_details(sub['id'])
+        if not details or 'code' not in details:
+            return
+    except Exception as e:
+        print(f"Failed to fetch details for submission {sub['id']}: {e}")
+        return
 
-        print(f"Processing submission #{sub['id']} for {sub['title']}...")
-        time.sleep(1.5)  # Preserve API rate limit quotas
-        
-        try:
-            details = get_submission_details(sub['id'])
-            if not details or 'code' not in details:
-                continue
-        except Exception as e:
-            print(f"Failed to fetch details for submission {sub['id']}: {e}")
-            continue
+    # Gather required metadata from API response
+    question_data = details['question']
+    qid_padded = str(question_data['questionId']).zfill(4)
+    difficulty = question_data.get('difficulty', 'Unknown')
+    tags = [tag['slug'] for tag in question_data.get('topicTags', []) if tag.get('slug')]
+    question_folder_name = f"{qid_padded}-{title_slug}"
 
-        question_data = details['question']
-        qid_padded = str(question_data['questionId']).zfill(4)
-        difficulty = question_data.get('difficulty', 'Unknown')
-        tags = [tag['slug'] for tag in question_data.get('topicTags', []) if tag.get('slug')]
-        question_folder_name = f"{qid_padded}-{title_slug}"
+    # Save to 'solutions' (flat structure)
+    all_folder = os.path.join("solutions", question_folder_name)
+    save_code_to_path(all_folder, filename, ext, details['code'])
+    print(f"  Saved to solutions: {full_filename}")
 
-        # 1. Save to solutions (The new folder structure you requested)
-        all_folder = os.path.join("solutions", question_folder_name)
-        save_code_to_path(all_folder, filename, ext, details['code'])
-        print(f"  Saved to solutions: {filename}.{ext}")
+    # Save to 'solutions-difficulty'
+    difficulty_folder = os.path.join("solutions-difficulty", difficulty, question_folder_name)
+    save_code_to_path(difficulty_folder, filename, ext, details['code'])
+    print(f"  Saved to solutions-difficulty: {full_filename}")
 
-        # 2. Save to solutions-difficulty
-        difficulty_folder = os.path.join("solutions-difficulty", difficulty, question_folder_name)
-        save_code_to_path(difficulty_folder, filename, ext, details['code'])
-        print(f"  Saved to solutions-difficulty: {filename}.{ext}")
-
-        # 3. Save to solutions-categories
-        if tags:
-            for tag in tags:
-                category_folder = os.path.join("solutions-categories", tag, question_folder_name)
-                save_code_to_path(category_folder, filename, ext, details['code'])
-                print(f"  Saved to solutions-categories ({tag}): {filename}.{ext}")
-        else:
-            uncat_folder = os.path.join("solutions-categories", "uncategorized", question_folder_name)
-            save_code_to_path(uncat_folder, filename, ext, details['code'])
-            print(f"  Saved to solutions-categories (uncategorized): {filename}.{ext}")
-
+    # Save to 'solutions-categories' (always dynamic, handled only on API fetch)
+    if tags:
+        for tag in tags:
+            category_folder = os.path.join("solutions-categories", tag, question_folder_name)
+            save_code_to_path(category_folder, filename, ext, details['code'])
+            print(f"  Saved to solutions-categories ({tag}): {full_filename}")
+    else:
+        uncat_folder = os.path.join("solutions-categories", "uncategorized", question_folder_name)
+        save_code_to_path(uncat_folder, filename, ext, details['code'])
+        print(f"  Saved to solutions-categories (uncategorized): {full_filename}")
 
 if __name__ == "__main__":
     sync_to_local()
