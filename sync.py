@@ -369,7 +369,7 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
     try:
         with open(readme_file, "w", encoding="utf-8") as f:
             f.write(readme_content)
-        print("README.md successfully updated with History Log at the bottom!")
+        print("README.md successfully updated!")
     except Exception as e:
         print(f"Error writing README.md: {e}")
 
