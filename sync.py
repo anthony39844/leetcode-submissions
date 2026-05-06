@@ -235,6 +235,71 @@ def sync_submission(sub):
         print(f"  Saved to {dest_root}: {full_filename}")
 
 
+def generate_readme_stats():
+    """Scans local folders to count solved problems by difficulty and writes stats directly to README.md."""
+    print("Generating README statistics...")
+    
+    easy_count = 0
+    medium_count = 0
+    hard_count = 0
+    total_unique = 0
+
+    # Scan solutions-difficulty to dynamically count unique problems solved per difficulty level
+    diff_path = "solutions-difficulty"
+    if os.path.exists(diff_path):
+        for diff_level in ["Easy", "Medium", "Hard"]:
+            level_folder = os.path.join(diff_path, diff_level)
+            if os.path.exists(level_folder):
+                # Count directories, representing individual problems
+                problems = [d for d in os.listdir(level_folder) if os.path.isdir(os.path.join(level_folder, d))]
+                if diff_level == "Easy":
+                    easy_count = len(problems)
+                elif diff_level == "Medium":
+                    medium_count = len(problems)
+                elif diff_level == "Hard":
+                    hard_count = len(problems)
+
+    total_unique = easy_count + medium_count + hard_count
+
+    # Build the Markdown stats section
+    stats_markdown = (
+        "### 📊 Progress Statistics\n\n"
+        f"| Difficulty | Solved Count |\n"
+        f"| :--- | :---: |\n"
+        f"| 🟢 Easy | **{easy_count}** |\n"
+        f"| 🟡 Medium | **{medium_count}** |\n"
+        f"| 🔴 Hard | **{hard_count}** |\n"
+        f"| **Total** | **{total_unique}** |\n\n"
+        f"*Last updated: {datetime.now(CST_TZ).strftime('%Y-%m-%d %I:%M %p')} (Central Time)*\n"
+    )
+
+    readme_file = "README.md"
+    if not os.path.exists(readme_file):
+        # Create an empty README with the boundary comments if it doesn't exist
+        with open(readme_file, "w") as f:
+            f.write("# LeetCode Submissions\n\n\n")
+
+    # Read the current contents of the README
+    with open(readme_file, "r") as f:
+        content = f.read()
+
+    # Locate the tags and inject the new statistics
+    start_tag = ""
+    end_tag = ""
+
+    if start_tag in content and end_tag in content:
+        before = content.split(start_tag)[0]
+        after = content.split(end_tag)[1]
+        
+        new_content = f"{before}{start_tag}\n\n{stats_markdown}\n{end_tag}{after}"
+        
+        with open(readme_file, "w") as f:
+            f.write(new_content)
+        print("README.md successfully updated with latest statistics!")
+    else:
+        print("Warning: Boundary tags missing from README.md. Statistics could not be updated.")
+
+
 def sync_to_local():
     # 1. Fetch your submissions list from the API
     submissions = get_all_accepted_submissions() 
@@ -242,6 +307,9 @@ def sync_to_local():
     # 2. Process each one using our optimized function
     for sub in submissions:
         sync_submission(sub)
+        
+    # 3. Regenerate README.md stats
+    generate_readme_stats()
 
 
 if __name__ == "__main__":
