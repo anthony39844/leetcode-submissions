@@ -49,8 +49,7 @@ EXTENSIONS = {
 UTC_TZ = ZoneInfo("UTC")
 CST_TZ = ZoneInfo("America/Chicago")
 
-# --- Dynamic Configuration ---
-# Restructure your workspace simply by editing this list!
+# --- Dynamic Workspace Configuration ---
 REQUIRED_FOLDERS = [
     {
         "name": "solutions",
@@ -58,14 +57,40 @@ REQUIRED_FOLDERS = [
     },
     {
         "name": "solutions-difficulty",
-        "has_dynamic_subfolder": True  # Instructs the script to inject the difficulty subfolder
+        "has_dynamic_subfolder": True  
     }
 ]
 
 
-def get_all_accepted_submissions():
-    """Paginate through all historical LeetCode submissions to fetch all accepted entries."""
-    print("Starting collection of all accepted submissions...")
+def get_cst_filename(unix_timestamp):
+    """Converts a UTC timestamp to US Central Time (CST/CDT) and formats it as a 12-hour AM/PM filename."""
+    utc_dt = datetime.fromtimestamp(int(unix_timestamp), tz=UTC_TZ)
+    cst_dt = utc_dt.astimezone(CST_TZ)
+    return cst_dt.strftime("%Y-%m-%d_%I-%M-%S-%p")
+
+
+def check_file_exists_locally(title_slug, timestamp, lang):
+    """Checks if a specific submission file already exists in ALL configured local folders."""
+    filename = get_cst_filename(timestamp)
+    ext = EXTENSIONS.get(lang, "txt")
+    full_filename = f"{filename}.{ext}"
+
+    for folder_config in REQUIRED_FOLDERS:
+        root_folder = folder_config['name']
+        file_found = False
+        if os.path.exists(root_folder):
+            for root, dirs, files in os.walk(root_folder):
+                if full_filename in files and root.endswith(title_slug):
+                    file_found = True
+                    break
+        if not file_found:
+            return False
+    return True
+
+
+def get_all_accepted_submissions(stop_on_first_match=False):
+    """Paginate through LeetCode submissions, stopping early the moment a match is found."""
+    print("Starting collection of accepted submissions...")
     all_accepted = []
     offset = 0
     limit = 20
@@ -99,17 +124,35 @@ def get_all_accepted_submissions():
             submissions = sub_list['submissions']
             has_next = sub_list['hasNext']
             
-            # Filter and store only accepted solutions
             accepted_batch = [s for s in submissions if s['statusDisplay'] == 'Accepted']
-            all_accepted.extend(accepted_batch)
             
+            # --- SMART OVERLAP CHECK ---
+            if stop_on_first_match:
+                stop_pagination = False
+                for sub in accepted_batch:
+                    if check_file_exists_locally(sub['titleSlug'], sub['timestamp'], sub['lang']):
+                        print(f"✨ Hit local historical boundary at '{get_cst_filename(sub['timestamp'])}'. Stopping pagination.")
+                        stop_pagination = True
+                        break
+                
+                if stop_pagination:
+                    # Only grab the truly brand-new submissions from this batch before stopping
+                    new_subs = []
+                    for sub in accepted_batch:
+                        if not check_file_exists_locally(sub['titleSlug'], sub['timestamp'], sub['lang']):
+                            new_subs.append(sub)
+                    all_accepted.extend(new_subs)
+                    break
+
+            # If no match was found in this batch, add them all and keep searching
+            all_accepted.extend(accepted_batch)
             offset += limit
-            time.sleep(1)  # Mild rate-limiting guard rails
+            time.sleep(1)  # Guard rail to prevent spamming LeetCode's gateway
         except Exception as e:
             print(f"Error: Pagination failed at offset {offset}: {e}")
             break
 
-    print(f"Completed fetching. Found {len(all_accepted)} total accepted submissions.")
+    print(f"Completed fetching. Identified {len(all_accepted)} unsynced submissions.")
     return all_accepted
 
 
@@ -131,13 +174,6 @@ def get_submission_details(submission_id):
     return response.json()['data']['submissionDetails']
 
 
-def get_cst_filename(unix_timestamp):
-    """Converts a UTC timestamp to US Central Time (CST/CDT) and formats it as a 12-hour AM/PM filename."""
-    utc_dt = datetime.fromtimestamp(int(unix_timestamp), tz=UTC_TZ)
-    cst_dt = utc_dt.astimezone(CST_TZ)
-    return cst_dt.strftime("%Y-%m-%d_%I-%M-%S-%p")
-
-
 def save_code_to_path(folder_path, filename, ext, code):
     """Saves solution content safely to disk."""
     os.makedirs(folder_path, exist_ok=True)
@@ -148,49 +184,38 @@ def save_code_to_path(folder_path, filename, ext, code):
 
 def sync_submission(sub):
     title_slug = sub['titleSlug']
-    
-    # Correctly derive the filename using the raw 'timestamp' from the API payload
     filename = get_cst_filename(sub['timestamp'])
     ext = EXTENSIONS.get(sub['lang'], "txt")
     full_filename = f"{filename}.{ext}"
 
-    # Track where the file is found during our local scan
     found_paths = {folder['name']: None for folder in REQUIRED_FOLDERS}
 
-    # 1. Scan local directories dynamically based on REQUIRED_FOLDERS config
+    # 1. Scan local directories to find copies
     for folder_config in REQUIRED_FOLDERS:
         root_folder = folder_config['name']
         if os.path.exists(root_folder):
             for root, dirs, files in os.walk(root_folder):
-                # Ensure we match the exact filename inside the correct problem folder
                 if full_filename in files and root.endswith(title_slug):
                     found_paths[root_folder] = os.path.join(root, full_filename)
                     break
 
-    # Determine which folders are missing the file
     missing_folders = [f for f in REQUIRED_FOLDERS if found_paths[f['name']] is None]
     found_folders = [f for f in REQUIRED_FOLDERS if found_paths[f['name']] is not None]
 
-    # --- Case 1: Already completely synced ---
+    # --- Case 1: Already fully synchronized ---
     if not missing_folders:
-        print(f"  Skipping: '{full_filename}' already exists in all configured folders.")
         return
 
-    # --- Case 2: Local Copy Optimization (Found in at least one folder) ---
+    # --- Case 2: Local Copy Optimization (No API usage) ---
     if len(found_folders) > 0:
         print(f"  Optimizing: Local copy detected for '{full_filename}'. Bypassing API...")
-        
-        # Grab the path of any existing local copy
         existing_path = found_paths[found_folders[0]['name']]
         path_parts = os.path.normpath(existing_path).split(os.sep)
-        question_folder_name = path_parts[-2]  # Extract e.g., "0001-two-sum"
+        question_folder_name = path_parts[-2]
 
-        # Dynamically copy to all missing folders
         for folder_config in missing_folders:
             dest_root = folder_config['name']
-            
             if folder_config['has_dynamic_subfolder']:
-                # Dynamically construct the subfolder path using the submission's difficulty
                 difficulty = sub.get('difficulty', 'Unknown')
                 dest_folder = os.path.join(dest_root, difficulty, question_folder_name)
             else:
@@ -199,13 +224,10 @@ def sync_submission(sub):
             os.makedirs(dest_folder, exist_ok=True)
             shutil.copy2(existing_path, os.path.join(dest_folder, full_filename))
             print(f"    -> Copied locally to: {dest_folder}")
-        
         return
 
-    # --- Case 3: API Fallback (Missing entirely) ---
+    # --- Case 3: API Fallback (Pull missing file from LeetCode) ---
     print(f"Processing submission #{sub['id']} for {sub['title']} (Calling API)...")
-    
-    # Respect rate limits
     time.sleep(1.5)  
     
     try:
@@ -216,16 +238,13 @@ def sync_submission(sub):
         print(f"Failed to fetch details for submission {sub['id']}: {e}")
         return
 
-    # Gather required metadata from API response
     question_data = details['question']
     qid_padded = str(question_data['questionId']).zfill(4)
     difficulty = question_data.get('difficulty', 'Unknown')
     question_folder_name = f"{qid_padded}-{title_slug}"
 
-    # Loop through REQUIRED_FOLDERS config dynamically to save the API data
     for folder_config in REQUIRED_FOLDERS:
         dest_root = folder_config['name']
-        
         if folder_config['has_dynamic_subfolder']:
             dest_folder = os.path.join(dest_root, difficulty, question_folder_name)
         else:
@@ -243,13 +262,11 @@ def generate_readme_stats():
     medium_count = 0
     hard_count = 0
 
-    # Scan solutions-difficulty to dynamically count unique problems solved per difficulty level
     diff_path = "solutions-difficulty"
     if os.path.exists(diff_path):
         for diff_level in ["Easy", "Medium", "Hard"]:
             level_folder = os.path.join(diff_path, diff_level)
             if os.path.exists(level_folder):
-                # Count directories, representing individual problems
                 problems = [d for d in os.listdir(level_folder) if os.path.isdir(os.path.join(level_folder, d))]
                 if diff_level == "Easy":
                     easy_count = len(problems)
@@ -260,7 +277,6 @@ def generate_readme_stats():
 
     total_unique = easy_count + medium_count + hard_count
 
-    # Build the Markdown stats section
     stats_markdown = (
         "### 📊 Progress Statistics\n\n"
         f"| Difficulty | Solved Count |\n"
@@ -276,21 +292,17 @@ def generate_readme_stats():
     start_tag = ""
     end_tag = ""
 
-    # 1. Ensure README exists and has the tags
     if not os.path.exists(readme_file):
         with open(readme_file, "w", encoding="utf-8") as f:
             f.write(f"# LeetCode Submissions\n\n{start_tag}\n{end_tag}\n")
 
-    # 2. Read current content
     with open(readme_file, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # 3. If the tags are missing, append them to the end of the file safely
     if start_tag not in content or end_tag not in content:
         print("Warning: Boundary tags missing from README.md. Appending them now...")
         content = content.rstrip() + f"\n\n{start_tag}\n{end_tag}\n"
 
-    # 4. Safely extract and slice using find() instead of split()
     start_idx = content.find(start_tag)
     end_idx = content.find(end_tag)
 
@@ -307,14 +319,30 @@ def generate_readme_stats():
 
 
 def sync_to_local():
-    # 1. Fetch your submissions list from the API
-    submissions = get_all_accepted_submissions() 
+    # 1. Automatically detect if we need to do a full historical backfill.
+    solutions_dir = "solutions"
+    is_empty_repo = True
     
-    # 2. Process each one using our optimized function
+    if os.path.exists(solutions_dir):
+        subfolders = [d for d in os.listdir(solutions_dir) if os.path.isdir(os.path.join(solutions_dir, d))]
+        if len(subfolders) > 5:  
+            is_empty_repo = False
+
+    stop_on_first_match = not is_empty_repo
+    
+    if stop_on_first_match:
+        print("🤖 Auto-detected existing repository. Running in fast Maintenance Mode.")
+    else:
+        print("🚀 Auto-detected empty or new repository. Running in full Backfill Mode.")
+
+    # 2. Fetch submissions (with smart early-stopping boundary detection)
+    submissions = get_all_accepted_submissions(stop_on_first_match=stop_on_first_match) 
+    
+    # 3. Process each submission
     for sub in submissions:
         sync_submission(sub)
         
-    # 3. Regenerate README.md stats
+    # 4. Regenerate README.md stats
     generate_readme_stats()
 
 
