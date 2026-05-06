@@ -92,7 +92,7 @@ def get_all_accepted_submissions():
             offset += limit
             time.sleep(1)  # Mild rate-limiting guard rails
         except Exception as e:
-            print(f"Error pagination failed at offset {offset}: {e}")
+            print(f"Error: Pagination failed at offset {offset}: {e}")
             break
 
     print(f"Completed fetching. Found {len(all_accepted)} total accepted submissions.")
@@ -124,8 +124,6 @@ def get_cst_filename(unix_timestamp):
     """Converts a UTC timestamp to US Central Time (CST/CDT) and formats it as a 12-hour AM/PM filename."""
     utc_dt = datetime.fromtimestamp(int(unix_timestamp), tz=UTC_TZ)
     cst_dt = utc_dt.astimezone(CST_TZ)
-    # %I is 12-hour hour (01-12)
-    # %p is AM/PM indicator
     return cst_dt.strftime("%Y-%m-%d_%I-%M-%S-%p")
 
 
@@ -146,19 +144,30 @@ def sync_to_local():
     for sub in submissions:
         ext = EXTENSIONS.get(sub['lang'], "txt")
         filename = get_cst_filename(sub['timestamp'])
-        
-        # Look ahead calculation to check for existing duplicates across locations
-        # We temporarily format folder path name just to check if it's already on disk.
-        # This saves LeetCode API call quotas by verifying local status first.
         title_slug = sub['titleSlug']
         
-        # We need the question details to construct the true folder paths. 
-        # But we don't have the questionId yet without an API hit.
-        # Optimization: Call details only if needed, or bypass check if not fetched before.
-        print(f"Processing submission #{sub['id']} for {sub['title']}...")
+        # We temporarily need to construct the folder name.
+        # Since we don't have the question ID yet, we check the directory structure first.
+        # However, to avoid calling the API, we can search if ANY directory ending with '-{title_slug}'
+        # already contains our '{filename}.{ext}'. 
         
-        # Limit API calls to preserve quotas
-        time.sleep(1.5)
+        already_exists = False
+        # Fast local search to see if we already downloaded this exact file in any of our folders
+        for root_folder in ["solutions-all", "solutions-difficulty"]:
+            if os.path.exists(root_folder):
+                for root, dirs, files in os.walk(root_folder):
+                    if f"{filename}.{ext}" in files and root.endswith(title_slug):
+                        already_exists = True
+                        break
+            if already_exists:
+                break
+
+        if already_exists:
+            print(f"Skipping: Submission from {filename} for {sub['title']} already exists locally.")
+            continue
+
+        print(f"Processing submission #{sub['id']} for {sub['title']}...")
+        time.sleep(1.5)  # Preserve API rate limit quotas
         
         try:
             details = get_submission_details(sub['id'])
@@ -174,20 +183,17 @@ def sync_to_local():
         tags = [tag['slug'] for tag in question_data.get('topicTags', []) if tag.get('slug')]
         question_folder_name = f"{qid_padded}-{title_slug}"
 
-        # Setup destination folders
+        # 1. Save to solutions (The new folder structure you requested)
+        all_folder = os.path.join("solutions", question_folder_name)
+        save_code_to_path(all_folder, filename, ext, details['code'])
+        print(f"  Saved to solutions: {filename}.{ext}")
+
+        # 2. Save to solutions-difficulty
         difficulty_folder = os.path.join("solutions-difficulty", difficulty, question_folder_name)
-        difficulty_file_path = os.path.join(difficulty_folder, f"{filename}.{ext}")
-
-        # Check if we already have this submission saved in difficulty
-        if os.path.exists(difficulty_file_path):
-            print(f"  Skipping: Submission from {filename} already exists locally.")
-            continue
-
-        # Save to solutions-difficulty
         save_code_to_path(difficulty_folder, filename, ext, details['code'])
-        print(f"  Saved to solutions-difficulty: {difficulty_file_path}")
+        print(f"  Saved to solutions-difficulty: {filename}.{ext}")
 
-        # Save to solutions-categories
+        # 3. Save to solutions-categories
         if tags:
             for tag in tags:
                 category_folder = os.path.join("solutions-categories", tag, question_folder_name)
