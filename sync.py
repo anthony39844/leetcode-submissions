@@ -239,4 +239,4 @@ def sync_submission(sub):
         print(f"  Saved to solutions-categories (uncategorized): {full_filename}")
 
 if __name__ == "__main__":
-    sync_to_local()
+    sync_submission()
