@@ -2,9 +2,9 @@ name: LeetCode Cookie Refresh
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 0 */14 * *"
-      timezone: "America/Chicago"
+  # schedule:
+  #   - cron: "0 0 */14 * *"
+  #     timezone: "America/Chicago"
 
 jobs:
   refresh:
