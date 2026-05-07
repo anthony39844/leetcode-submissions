@@ -1,0 +1,48 @@
+name: DIY Cookie Refresh
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 */14 * *"
+      timezone: "America/Chicago"
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium
+
+      - name: Run Refresh Script
+        id: fetch_cookies
+        env:
+          LEETCODE_EMAIL: ${{ secrets.LEETCODE_EMAIL }}
+          LEETCODE_PASSWORD: ${{ secrets.LEETCODE_PASSWORD }}
+        run: |
+          # Run the script and capture the specific RESULT lines
+          output=$(python refresh_cookies.py)
+          echo "$output"
+          
+          # Extract values from output and save to environment
+          echo "NEW_SESSION=$(echo "$output" | grep RESULT_SESSION | cut -d'=' -f2)" >> $GITHUB_ENV
+          echo "NEW_CSRF=$(echo "$output" | grep RESULT_CSRF | cut -d'=' -f2)" >> $GITHUB_ENV
+
+      - name: Update Repository Secrets
+        if: env.NEW_SESSION != ''
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_UPDATE_PAT }}
+        run: |
+          # Use the built-in GitHub CLI to update the secrets
+          gh secret set LEETCODE_SESSION --body "$NEW_SESSION"
+          gh secret set LEETCODE_CSRF_TOKEN --body "$NEW_CSRF"
+          echo "Secrets updated successfully."
