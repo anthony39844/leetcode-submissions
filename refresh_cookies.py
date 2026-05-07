@@ -17,19 +17,29 @@ def main():
         page = context.new_page()
 
         print("Navigating to LeetCode login...")
-        page.goto("https://leetcode.com/accounts/login/")
+        # Use a longer timeout for the initial page load
+        page.goto("https://leetcode.com/accounts/login/", wait_until="networkidle", timeout=60000)
 
-        # Fill login form
+        print("Filling credentials...")
+        # Wait for the login input to be visible before interacting
+        page.wait_for_selector('input[name="login"]', state="visible")
         page.fill('input[name="login"]', email)
         page.fill('input[name="password"]', password)
-        page.click('button[type="submit"]')
 
-        # Wait for navigation to complete (logged in)
+        print("Attempting to click Sign In...")
+        # LeetCode sometimes uses an ID for the button; let's try the most common one
+        submit_button = page.locator('button#signin_btn, button[type="submit"]')
+        
+        # Click and wait for the page to navigate away from the login screen
+        # This is more reliable than waiting for a specific container
         try:
-            page.wait_for_selector(".nav-item-container", timeout=15000)
-            print("Login successful!")
-        except:
-            print("Login failed or timed out. Check credentials or CAPTCHA.")
+            with page.expect_navigation(timeout=30000):
+                submit_button.click()
+            print("Login successful - Page navigated.")
+        except Exception as e:
+            # If it fails, take a screenshot to help us debug (GitHub uploads this as an artifact if configured)
+            page.screenshot(path="login_error.png")
+            print(f"Login failed. It's possible a CAPTCHA appeared. Error: {e}")
             browser.close()
             sys.exit(1)
 
