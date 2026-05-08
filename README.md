@@ -8,10 +8,10 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 | :--- | :---: |
 | 🟢 Easy | **78** |
 | 🟡 Medium | **69** |
-| 🔴 Hard | **6** |
-| **Total** | **153** |
+| 🔴 Hard | **8** |
+| **Total** | **155** |
 
-*Last updated: 2026-05-08 01:52 AM (Central Time)*
+*Last updated: 2026-05-08 02:15 AM (Central Time)*
 
 ## 📂 Repository Structure
 
@@ -20,5 +20,6 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 
 ### 📈 Daily History Log
 
+* **2026-05-08:** Solved 2 problems (+2 Hard)
 * **2026-05-07:** Solved 1 problem (+1 Easy)
 * **2026-05-06:** Started tracking! Solved 152 total problems.
