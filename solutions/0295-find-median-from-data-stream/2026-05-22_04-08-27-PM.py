@@ -1,0 +1,30 @@
+class MedianFinder:
+
+    def __init__(self):
+        self.min_heap = []
+        self.max_heap = []
+
+    def addNum(self, num: int) -> None:
+        # add to max heap if num less than current max in max heap
+        # else add to min heap
+        if self.max_heap and self.max_heap[0] > num:
+            heapq.heappush_max(self.max_heap, num)
+        else:
+            heapq.heappush(self.min_heap, num)
+        
+        # balance the heaps lengths
+        if len(self.min_heap) - len(self.max_heap) > 1:
+            heapq.heappush_max(self.max_heap, heapq.heappop(self.min_heap))
+        elif len(self.max_heap) - len(self.min_heap) > 1:
+            heapq.heappush(self.min_heap, heapq.heappop_max(self.max_heap))
+        
+    def findMedian(self) -> float:
+        if (len(self.min_heap) + len(self.max_heap)) % 2 == 0:
+            return (self.min_heap[0] + self.max_heap[0]) / 2
+        else:
+            return self.max_heap[0] if len(self.max_heap) > len(self.min_heap) else self.min_heap[0]
+
+# Your MedianFinder object will be instantiated and called as such:
+# obj = MedianFinder()
+# obj.addNum(num)
+# param_2 = obj.findMedian()
