@@ -285,7 +285,7 @@ def generate_readme_stats(new_submissions=None):
 
     # 2. Read the existing README to parse historical numbers and extract the log
     readme_file = "README.md"
-    existing_history_raw = []
+    existing_history_blocks = []
     prev_easy, prev_medium, prev_hard = 0, 0, 0
 
     if os.path.exists(readme_file):
@@ -304,27 +304,33 @@ def generate_readme_stats(new_submissions=None):
                 try: prev_hard = int(line.split("**")[1])
                 except: pass
 
-        # --- BOTTOM-OF-FILE LOG GATHERING ---
+        # --- SAFE LINE-BY-LINE LOG GATHERING ---
         inside_log = False
+        current_block = []
+        
         for line in lines:
             if "### 📈 Daily History Log" in line:
                 inside_log = True
                 continue
             if inside_log:
-                if line.strip() or (existing_history_raw and existing_history_raw[-1] != "\n"):
-                    existing_history_raw.append(line)
-
-    # Clean up the gathered history into distinct structural string fragments
-    history_content_str = "".join(existing_history_raw).strip()
-    history_entries = history_content_str.split("\n\n") if history_content_str else []
-    history_entries = [e.strip() for e in history_entries if e.strip()]
-
-    # 3. Check if we actually synced any submissions at all today
-    if len(new_submissions) > 0:
-        today_prefix = f"* **{today_str}:**"
-        # Deduplicate if run multiple times today
-        history_entries = [e for e in history_entries if not e.startswith(today_prefix)]
+                # If we hit a new date line, save the previous block and start a new one
+                if line.strip().startswith("* **"):
+                    if current_block:
+                        existing_history_blocks.append("".join(current_block).strip())
+                        current_block = []
+                if line.strip() or current_block:
+                    current_block.append(line)
         
+        # Append the very last block
+        if current_block:
+            existing_history_blocks.append("".join(current_block).strip())
+
+    # 3. Clean and filter out today's entry if it already exists (to allow re-runs)
+    today_prefix = f"* **{today_str}:**"
+    history_entries = [b for b in existing_history_blocks if b and not b.startswith(today_prefix)]
+
+    # 4. Format today's log entry if we have new submissions
+    if len(new_submissions) > 0:
         # Calculate net new unique problems added to the directory
         delta_easy = max(0, easy_count - prev_easy)
         delta_medium = max(0, medium_count - prev_medium)
@@ -335,7 +341,6 @@ def generate_readme_stats(new_submissions=None):
         unique_titles = list({sub['title']: True for sub in new_submissions}.keys())
         total_sub_count = len(unique_titles)
         
-        # Build a descriptive header line showing both total active items and completely new items
         plural_suffix = "s" if total_sub_count > 1 else ""
         header_line = f"{today_prefix} Worked on {total_sub_count} problem{plural_suffix}"
         
@@ -355,9 +360,10 @@ def generate_readme_stats(new_submissions=None):
     if not history_entries:
         history_entries.append(f"* **{today_str}:** Started tracking! Solved {total_unique} total problems.")
 
+    # Combine blocks cleanly using double newlines
     history_block = "### 📈 Daily History Log\n\n" + "\n\n".join(history_entries) + "\n"
 
-    # 4. Completely assemble the README
+    # 5. Completely assemble the README
     readme_content = f"""# LeetCode Submissions 🚀
 
 My automated system for tracking solved LeetCode problems, categorized by difficulty.
@@ -380,7 +386,7 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 
 {history_block}"""
 
-    # 5. Overwrite the file
+    # 6. Overwrite the file
     try:
         with open(readme_file, "w", encoding="utf-8") as f:
             f.write(readme_content)
