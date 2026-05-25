@@ -254,10 +254,13 @@ def sync_submission(sub):
         print(f"  Saved to {dest_root}: {full_filename}")
 
 
-def generate_readme_stats():
+def generate_readme_stats(new_submissions=None):
     """Reads existing README, calculates daily delta, and appends to the history log at the bottom."""
     print("Generating README statistics...")
     
+    if new_submissions is None:
+        new_submissions = []
+        
     easy_count = 0
     medium_count = 0
     hard_count = 0
@@ -281,7 +284,7 @@ def generate_readme_stats():
 
     # 2. Read the existing README to parse historical numbers and extract the log
     readme_file = "README.md"
-    existing_history = []
+    existing_history_raw = []
     prev_easy, prev_medium, prev_hard = 0, 0, 0
 
     if os.path.exists(readme_file):
@@ -301,48 +304,59 @@ def generate_readme_stats():
                 except: pass
 
         # --- BOTTOM-OF-FILE LOG GATHERING ---
-        # Everything after our heading is treated as a log entry
         inside_log = False
         for line in lines:
             if "### 📈 Daily History Log" in line:
                 inside_log = True
                 continue
             if inside_log:
-                if line.strip().startswith("* **"):
-                    existing_history.append(line.strip())
+                if line.strip() or (existing_history_raw and existing_history_raw[-1] != "\n"):
+                    existing_history_raw.append(line)
 
-    # 3. Calculate today's delta
-    delta_easy = max(0, easy_count - prev_easy)
-    delta_medium = max(0, medium_count - prev_medium)
-    delta_hard = max(0, hard_count - prev_hard)
-    total_delta = delta_easy + delta_medium + delta_hard
+    # Clean up the gathered history into distinct structural string fragments
+    history_content_str = "".join(existing_history_raw).strip()
+    history_entries = history_content_str.split("\n\n") if history_content_str else []
+    history_entries = [e.strip() for e in history_entries if e.strip()]
 
-    # 4. Format today's log entry
-    new_history_list = list(existing_history)
-    if total_delta > 0:
+    # 3. FIX: Check if we actually synced any submissions at all today
+    if len(new_submissions) > 0:
         today_prefix = f"* **{today_str}:**"
-        # Deduplicate: if we run this multiple times today, replace the earlier run's entry
-        new_history_list = [item for item in new_history_list if not item.startswith(today_prefix)]
+        # Deduplicate if run multiple times today
+        history_entries = [e for e in history_entries if not e.startswith(today_prefix)]
         
-        details = []
-        if delta_easy > 0: details.append(f"+{delta_easy} Easy")
-        if delta_medium > 0: details.append(f"+{delta_medium} Medium")
-        if delta_hard > 0: details.append(f"+{delta_hard} Hard")
-        details_str = f" ({', '.join(details)})" if details else ""
+        # Calculate net new unique problems added to the directory
+        delta_easy = max(0, easy_count - prev_easy)
+        delta_medium = max(0, medium_count - prev_medium)
+        delta_hard = max(0, hard_count - prev_hard)
+        net_new_unique = delta_easy + delta_medium + delta_hard
         
-        plural_suffix = "s" if total_delta > 1 else ""
-        today_entry = f"{today_prefix} Solved {total_delta} problem{plural_suffix}{details_str}"
+        # Deduplicate the titles extracted from today's execution batch
+        unique_titles = list({sub['title']: True for sub in new_submissions}.keys())
+        total_sub_count = len(unique_titles)
         
-        # Prepend to the top of the history list so newest dates are always on top
-        new_history_list.insert(0, today_entry)
+        # Build a descriptive header line showing both total active items and completely new items
+        plural_suffix = "s" if total_sub_count > 1 else ""
+        header_line = f"{today_prefix} Worked on {total_sub_count} problem{plural_suffix}"
+        
+        # Append net-new statistics to parenthetical breakdown if unique milestones were cleared
+        if net_new_unique > 0:
+            details = []
+            if delta_easy > 0: details.append(f"+{delta_easy} Easy")
+            if delta_medium > 0: details.append(f"+{delta_medium} Medium")
+            if delta_hard > 0: details.append(f"+{delta_hard} Hard")
+            header_line += f" ({', '.join(details)} net new)"
+        
+        bullet_items = [f"  * {title}" for title in unique_titles]
+        today_entry_block = header_line + "\n" + "\n".join(bullet_items)
+        history_entries.insert(0, today_entry_block)
 
     # If no history exists at all yet, create a starting entry
-    if not new_history_list:
-        new_history_list.append(f"* **{today_str}:** Started tracking! Solved {total_unique} total problems.")
+    if not history_entries:
+        history_entries.append(f"* **{today_str}:** Started tracking! Solved {total_unique} total problems.")
 
-    history_block = "### 📈 Daily History Log\n\n" + "\n".join(new_history_list) + "\n"
+    history_block = "### 📈 Daily History Log\n\n" + "\n\n".join(history_entries) + "\n"
 
-    # 5. Completely assemble the README (Structure is now on top!)
+    # 4. Completely assemble the README
     readme_content = f"""# LeetCode Submissions 🚀
 
 My automated system for tracking solved LeetCode problems, categorized by difficulty.
@@ -365,7 +379,7 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 
 {history_block}"""
 
-    # 6. Overwrite the file
+    # 5. Overwrite the file
     try:
         with open(readme_file, "w", encoding="utf-8") as f:
             f.write(readme_content)
@@ -398,8 +412,8 @@ def sync_to_local():
     for sub in submissions:
         sync_submission(sub)
         
-    # 4. Regenerate README.md stats
-    generate_readme_stats()
+    # 4. Regenerate README.md stats (passing the fetched submissions payload)
+    generate_readme_stats(new_submissions=submissions)
 
 
 if __name__ == "__main__":
