@@ -80,6 +80,7 @@ def check_file_exists_locally(title_slug, timestamp, lang):
         file_found = False
         if os.path.exists(root_folder):
             for root, dirs, files in os.walk(root_folder):
+                # FIXED: Checks if the exact timestamped file exists inside the matching problem slug folder
                 if full_filename in files and root.endswith(title_slug):
                     file_found = True
                     break
@@ -318,7 +319,7 @@ def generate_readme_stats(new_submissions=None):
     history_entries = history_content_str.split("\n\n") if history_content_str else []
     history_entries = [e.strip() for e in history_entries if e.strip()]
 
-    # 3. FIX: Check if we actually synced any submissions at all today
+    # 3. Check if we actually synced any submissions at all today
     if len(new_submissions) > 0:
         today_prefix = f"* **{today_str}:**"
         # Deduplicate if run multiple times today
