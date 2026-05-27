@@ -342,7 +342,7 @@ def generate_readme_stats(new_submissions=None):
         total_sub_count = len(unique_titles)
         
         plural_suffix = "s" if total_sub_count > 1 else ""
-        header_line = f"{today_prefix} Worked on {total_sub_count} problem{plural_suffix}"
+        header_line = f"{today_prefix} Solved {total_sub_count} problem{plural_suffix}"
         
         # Append net-new statistics to parenthetical breakdown if unique milestones were cleared
         if net_new_unique > 0:
@@ -350,7 +350,7 @@ def generate_readme_stats(new_submissions=None):
             if delta_easy > 0: details.append(f"+{delta_easy} Easy")
             if delta_medium > 0: details.append(f"+{delta_medium} Medium")
             if delta_hard > 0: details.append(f"+{delta_hard} Hard")
-            header_line += f" ({', '.join(details)} net new)"
+            header_line += f" ({', '.join(details)})"
         
         bullet_items = [f"  * {title}" for title in unique_titles]
         today_entry_block = header_line + "\n" + "\n".join(bullet_items)
