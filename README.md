@@ -7,11 +7,11 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 | Difficulty | Solved Count |
 | :--- | :---: |
 | 🟢 Easy | **78** |
-| 🟡 Medium | **83** |
+| 🟡 Medium | **85** |
 | 🔴 Hard | **13** |
-| **Total** | **174** |
+| **Total** | **176** |
 
-*Last updated: 2026-05-28 03:43 AM (Central Time)*
+*Last updated: 2026-05-29 03:42 AM (Central Time)*
 
 ## 📂 Repository Structure
 
@@ -19,6 +19,11 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 * **`solutions-difficulty/`**: Solutions organized dynamically into `Easy`, `Medium`, and `Hard` folders.
 
 ### 📈 Daily History Log
+
+* **2026-05-29:** Solved 3 problems (+2 Medium)
+  * Clone Graph
+  * Max Area of Island
+  * Number of Islands
 
 * **2026-05-28:** Solved 1 problem (+1 Hard)
   * Word Search II
