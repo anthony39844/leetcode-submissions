@@ -7,11 +7,11 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 | Difficulty | Solved Count |
 | :--- | :---: |
 | 🟢 Easy | **78** |
-| 🟡 Medium | **88** |
+| 🟡 Medium | **90** |
 | 🔴 Hard | **13** |
-| **Total** | **179** |
+| **Total** | **181** |
 
-*Last updated: 2026-05-31 03:15 AM (Central Time)*
+*Last updated: 2026-06-01 05:22 AM (Central Time)*
 
 ## 📂 Repository Structure
 
@@ -19,6 +19,10 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 * **`solutions-difficulty/`**: Solutions organized dynamically into `Easy`, `Medium`, and `Hard` folders.
 
 ### 📈 Daily History Log
+
+* **2026-06-01:** Solved 2 problems (+2 Medium)
+  * Course Schedule II
+  * Course Schedule
 
 * **2026-05-31:** Solved 2 problems (+2 Medium)
   * Surrounded Regions
