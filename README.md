@@ -7,11 +7,11 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 | Difficulty | Solved Count |
 | :--- | :---: |
 | 🟢 Easy | **78** |
-| 🟡 Medium | **92** |
-| 🔴 Hard | **14** |
-| **Total** | **184** |
+| 🟡 Medium | **93** |
+| 🔴 Hard | **15** |
+| **Total** | **186** |
 
-*Last updated: 2026-06-07 03:24 AM (Central Time)*
+*Last updated: 2026-06-08 04:24 AM (Central Time)*
 
 ## 📂 Repository Structure
 
@@ -19,6 +19,10 @@ My automated system for tracking solved LeetCode problems, categorized by diffic
 * **`solutions-difficulty/`**: Solutions organized dynamically into `Easy`, `Medium`, and `Hard` folders.
 
 ### 📈 Daily History Log
+
+* **2026-06-08:** Solved 2 problems (+1 Medium, +1 Hard)
+  * Min Cost to Connect All Points
+  * Reconstruct Itinerary
 
 * **2026-06-06:** Solved 1 problem (+1 Medium)
   * Network Delay Time
